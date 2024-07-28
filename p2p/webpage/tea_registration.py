@@ -1,0 +1,59 @@
+from fastapi import APIRouter, HTTPException, Depends
+from db import get_db1
+import pyodbc
+from pydantic import BaseModel
+import random
+import string
+
+from typing import List
+
+class TeacherRegistration(BaseModel):
+    SCHOOL_ID: str
+    TEACHER_NAME: str
+    QUALIFICATION: str
+    AADHAR_NO: str
+    TEACHER_MOBILE: str
+    TEACHER_EMAIL: str
+    DOC_ID: str
+    D_NO: str
+    STREET: str
+    AREA: str
+    CITY: str
+    DISTRICT: str
+    STATE: str
+    PIN_CODE: str
+    SUBJECTS: List[str]
+    TEACHER_PIC: str  # Add TEACHER_PIC field
+
+tea_router = APIRouter()
+
+@tea_router.post("/tregister")
+async def register_teacher(teacher: TeacherRegistration, db=Depends(get_db1)):
+    # Generate TEACHER_ID and PASSWORD
+    TEACHER_ID = ('t'+teacher.TEACHER_NAME[:2] + teacher.SCHOOL_ID[3:6] + ''.join(random.choices(string.digits, k=4))).upper()
+    PASSWORD = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+
+    cursor = db.cursor()
+
+    # Insert into teachers table
+    cursor.execute(
+        "INSERT INTO teachers (SCHOOL_ID, TEACHER_ID, TEACHER_NAME, QUALIFICATION, AADHAR_NO, TEACHER_MOBILE, TEACHER_EMAIL, DOC_ID, PASSWORD, TEACHER_PIC) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (teacher.SCHOOL_ID, TEACHER_ID, teacher.TEACHER_NAME, teacher.QUALIFICATION, teacher.AADHAR_NO, teacher.TEACHER_MOBILE, teacher.TEACHER_EMAIL, teacher.DOC_ID, PASSWORD, teacher.TEACHER_PIC)
+    )
+
+    # Insert into address table
+    cursor.execute(
+        "INSERT INTO address (ID, MOBILE, D_NO, STREET, AREA, CITY, DISTRICT, STATE, PIN_CODE) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (TEACHER_ID, teacher.TEACHER_MOBILE, teacher.D_NO, teacher.STREET, teacher.AREA, teacher.CITY, teacher.DISTRICT, teacher.STATE, teacher.PIN_CODE)
+    )
+
+    # Insert into subjects table
+    for subject in teacher.SUBJECTS:
+        cursor.execute(
+            "INSERT INTO subjects (TEACHER_ID, SUBJECT) VALUES (%s, %s)",
+            (TEACHER_ID, subject)
+        )
+
+    db.commit()
+
+    return {"message": "Teacher registration successful", "TEACHER_ID": TEACHER_ID, "PASSWORD": PASSWORD}
