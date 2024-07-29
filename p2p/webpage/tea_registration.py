@@ -4,7 +4,6 @@ import pyodbc
 from pydantic import BaseModel
 import random
 import string
-
 from typing import List
 
 class TeacherRegistration(BaseModel):
@@ -34,6 +33,45 @@ async def register_teacher(teacher: TeacherRegistration, db=Depends(get_db1)):
     PASSWORD = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
 
     cursor = db.cursor()
+
+    # Create tables if they don't exist
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS teachers (
+        SCHOOL_ID VARCHAR(255),
+        TEACHER_ID VARCHAR(255) PRIMARY KEY,
+        TEACHER_NAME VARCHAR(255),
+        QUALIFICATION VARCHAR(255),
+        AADHAR_NO VARCHAR(255),
+        TEACHER_MOBILE VARCHAR(255),
+        TEACHER_EMAIL VARCHAR(255),
+        DOC_ID VARCHAR(255),
+        PASSWORD VARCHAR(255),
+        TEACHER_PIC TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS address (
+        ID VARCHAR(255),
+        MOBILE VARCHAR(255),
+        D_NO VARCHAR(255),
+        STREET VARCHAR(255),
+        AREA VARCHAR(255),
+        CITY VARCHAR(255),
+        DISTRICT VARCHAR(255),
+        STATE VARCHAR(255),
+        PIN_CODE VARCHAR(255),
+        PRIMARY KEY (ID, MOBILE)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS subjects (
+        TEACHER_ID VARCHAR(255),
+        SUBJECT VARCHAR(255),
+        PRIMARY KEY (TEACHER_ID, SUBJECT)
+    )
+    """)
 
     # Insert into teachers table
     cursor.execute(

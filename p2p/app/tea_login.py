@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
-# from db import get_db1
-import pyodbc
+from db import get_db1
+import mysql.connector
 from pydantic import BaseModel
 
 tl_router = APIRouter()
@@ -10,25 +10,33 @@ class TeacherLogin(BaseModel):
     password: str
 
 @tl_router.post("/teacher_login")
-async def teacher_login(teacher: TeacherLogin):
-    # teacherId = teacher.teacherId
-    # password = teacher.password
-    # print(teacherId, password)
-    # cursor = db.cursor()
-    # cursor.execute("SELECT TEACHER_NAME FROM teachers WHERE TEACHER_ID = ?", (teacherId,))
-    # teacher_name = cursor.fetchone()[0]
-    # cursor.execute("SELECT SUBJECT FROM subjects WHERE TEACHER_ID = ?", (teacherId,))
-    # subjects = [row[0] for row in cursor.fetchall()]
-
-
-    # cursor.execute(f"SELECT * FROM teachers WHERE TEACHER_ID = '{teacherId}' AND PASSWORD = '{password}'")
-    # r = cursor.fetchone()
+async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
+    teacherId = teacher.teacherId
+    password = teacher.password
+    print(teacherId, password)
     
-    # cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = ?", (r.SCHOOL_ID,))
-    # school_name = cursor.fetchone()[0]
+    cursor = db.cursor()
     
-    # if r is None:
-    #     raise HTTPException(status_code=400, detail="Invalid teacherId or password")
+    cursor.execute("SELECT * FROM teachers WHERE TEACHER_ID = %s AND PASSWORD = %s", (teacherId, password))
+    teacher_row = cursor.fetchone()
     
-    # return {"message": "Login successful", "schoolId": r.SCHOOL_ID,"schoolName": school_name, "teacherName": teacher_name, "subjects": subjects}
-    return {"message": "Login successful", "schoolId": "CHGA109182","schoolName": "CHAITANYA PUBLIC SCHOOL", "teacherName": "PAVAN", "subjects":["ENGLISH","TELUGU","MATHS"]}
+    if teacher_row is None:
+        print("Not found")
+        raise HTTPException(status_code=400, detail="Invalid teacherId or password")
+    
+    teacher_dict = {column[0]: value for column, value in zip(cursor.description, teacher_row)}
+    
+    cursor.execute("SELECT TEACHER_NAME FROM teachers WHERE TEACHER_ID = %s", (teacherId,))
+    teacher_details = cursor.fetchone()
+    
+    cursor.execute("SELECT SUBJECT FROM subjects WHERE TEACHER_ID = %s", (teacherId,))
+    subjects = [row[0] for row in cursor.fetchall()]
+    
+    cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (teacher_row[0],))  # Assuming SCHOOL_ID is the third column
+    school_name = cursor.fetchone()[0]
+    
+    teacher_dict.update({
+        "subjects": subjects
+    })
+    print(teacher_dict)
+    return {"message": "Login successful", "teacher": teacher_dict}
