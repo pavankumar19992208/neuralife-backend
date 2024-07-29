@@ -19,9 +19,14 @@ async def school_login(school: SchoolLogin):
     cursor = db.cursor()
 
     # Use parameterized query to prevent SQL injection
-    cursor.execute("SELECT SCHOOL_ID, SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s AND PASSWORD = %s", (schoolId, password))
+    cursor.execute("SELECT * FROM schools WHERE SCHOOL_ID = %s AND PASSWORD = %s", (schoolId, password))
     row = cursor.fetchone()
    
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid schoolId or password")
-    return {"message":"login successfull","SCHOOL_ID": row[0], "SCHOOL_NAME": row[1]}
+    
+    # Convert the row to a dictionary
+    columns = [column[0] for column in cursor.description]
+    result = dict(zip(columns, row))
+    
+    return {"message": "login successful", "data": result}
