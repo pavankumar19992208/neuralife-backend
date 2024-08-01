@@ -26,6 +26,7 @@ class Student(BaseModel):
     STATE: str
     PIN_CODE: str
     STUDENT_PIC: str  # New field for profile picture URL
+    STUDENT_ID: str
 
 @st_router.post("/st_register")
 async def register_student_endpoint(student: Student):
@@ -70,12 +71,6 @@ async def register_student_endpoint(student: Student):
     """
     cursor.execute(create_address_table_query)
 
-    # Generate student ID
-    random_int = str(random.randint(100, 999))
-    school_id = data['SCHOOL_ID']
-    grade_str = data['GRADE'].zfill(2)
-    student_id = "S" + school_id[:2] + school_id[3:5] + grade_str + random_int
-
     # Generate a random password
     password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
 
@@ -85,7 +80,7 @@ async def register_student_endpoint(student: Student):
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(students_query, (
-        school_id, student_id, data['STUDENT_NAME'], data['GRADE'], data['SECTION'], data['AADHAR_NO'],
+        data['SCHOOL_ID'], data['STUDENT_ID'], data['STUDENT_NAME'], data['GRADE'], data['SECTION'], data['AADHAR_NO'],
         data['GUARDIAN_NAME'], data['RELATION'], data['GUARDIAN_MOBILE'], data['GUARDIAN_EMAIL'], data['DOC_ID'],
         password, data['STUDENT_PIC']
     ))
@@ -96,10 +91,10 @@ async def register_student_endpoint(student: Student):
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, '')
     """
     cursor.execute(address_query, (
-        student_id, data['GUARDIAN_MOBILE'], data['D_NO'], data['STREET'], data['AREA'], data['CITY'],
+        data['STUDENT_ID'], data['GUARDIAN_MOBILE'], data['D_NO'], data['STREET'], data['AREA'], data['CITY'],
         data['DISTRICT'], data['STATE'], data['PIN_CODE']
     ))
 
     cnxn.commit()
 
-    return {"student_id": student_id, "password": password}
+    return {"student_id": data['STUDENT_ID'], "password": password}
