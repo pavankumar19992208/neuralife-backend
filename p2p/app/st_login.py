@@ -6,12 +6,12 @@ from pydantic import BaseModel
 stl_router = APIRouter()
 
 class StudentLogin(BaseModel):
-    studentId: str
+    userId: str
     password: str
 
 @stl_router.post("/st_login")
 async def teacher_login(student: StudentLogin, db=Depends(get_db1)):
-    studentId = student.studentId
+    studentId = student.userId
     password = student.password
     print(studentId, password)
 

@@ -14,15 +14,16 @@ def get_db():
     return cnxn
 
 
+import mysql.connector
+
 def get_db1():
-    cnxn = mysql.connector.connect(
-        host="sql12.freesqldatabase.com",
-        database="sql12722136",
-        user="sql12722136",
-        password="ly63wq3vvN",
-        port=3306
+    conn = mysql.connector.connect(
+        host="p2ptechworks.cr6yco4g2jh4.eu-north-1.rds.amazonaws.com",
+        user="p2p_admin",  # Replace with your RDS username
+        password="Amma9502",  # Replace with your RDS password
+        database="p2p_data"  # Replace with your RDS database name
     )
-    return cnxn
+    return conn
 
 def get_db2():
     config = {

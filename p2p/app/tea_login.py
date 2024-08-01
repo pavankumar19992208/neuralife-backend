@@ -6,12 +6,12 @@ from pydantic import BaseModel
 tl_router = APIRouter()
 
 class TeacherLogin(BaseModel):
-    teacherId: str
+    userId: str
     password: str
 
 @tl_router.post("/teacher_login")
 async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
-    teacherId = teacher.teacherId
+    teacherId = teacher.userId
     password = teacher.password
     print(teacherId, password)
     
@@ -36,6 +36,7 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     school_name = cursor.fetchone()[0]
     
     teacher_dict.update({
+        "SCHOOL_NAME": school_name,
         "subjects": subjects
     })
     print(teacher_dict)
