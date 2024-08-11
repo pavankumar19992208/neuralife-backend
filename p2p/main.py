@@ -7,6 +7,8 @@ from app.tea_login import tl_router
 from app.roll_no import rl_router
 from app.st_login import stl_router
 from app.get_studentlist import std_router
+from app.upload_marks import upm_router
+from app.acreport import acreport_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(docs_url="/docs")
@@ -36,3 +38,5 @@ app.include_router(tl_router)
 app.include_router(stl_router)
 app.include_router(std_router)
 app.include_router(rl_router)
+app.include_router(upm_router)
+app.include_router(acreport_router)
