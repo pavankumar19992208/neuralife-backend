@@ -1,53 +1,81 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from db import get_db1
-import pyodbc
+import mysql.connector
 from pydantic import BaseModel
-
 
 class RollNumberDetails(BaseModel):
     schoolId: str
+    year: str
     grade: str
     section: str
 
+app = FastAPI()
 rl_router = APIRouter()
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"message": "Validation error", "details": exc.errors()},
+    )
+
 @rl_router.post("/rlno")
-async def generate_roll_numbers(details: RollNumberDetails, db=Depends(get_db1)):
+async def generate_roll_numbers(details: RollNumberDetails):
+    db = get_db1()
     cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'R_NO'")
-    r_no_exists = cursor.fetchone()
-
-    # Add R_NO column if it doesn't exist
-    if not r_no_exists:
-        cursor.execute("ALTER TABLE students ADD R_NO int")
-
-    # Get the students with the same school_id, grade, and section, ordered by name
-    cursor.execute("SELECT STUDENT_ID, STUDENT_NAME FROM students WHERE SCHOOL_ID = ? AND GRADE = ? AND SECTION = ? AND R_NO IS NULL ORDER BY STUDENT_NAME", (details.schoolId, details.grade, details.section))
-    students = cursor.fetchall()
-
-    if not students:
-        cursor.execute("SELECT R_NO, GRADE, SECTION, STUDENT_NAME FROM students WHERE SCHOOL_ID = ? AND GRADE = ? AND SECTION = ? ORDER BY R_NO", (details.schoolId, details.grade, details.section))
-        students_table = cursor.fetchall()
-
-    # Convert to list of dictionaries
-        students_table = [dict(zip(["R_NO", "GRADE", "SECTION", "STUDENT_NAME"], student)) for student in students_table]
- 
-        return {"message": "Roll numbers have been generated ", "students": students_table}
-
-    # Generate and update roll numbers for these students
-    for i, student in enumerate(students, start=1):
-        cursor.execute("UPDATE students SET R_NO = ? WHERE STUDENT_ID = ?", (i, student[0]))
-
-    # Commit the changes
-    db.commit()
-
-    # Get the updated students table
-    # Get the updated students table
-    cursor.execute("SELECT R_NO, GRADE, SECTION, STUDENT_NAME FROM students WHERE SCHOOL_ID = ? AND GRADE = ? AND SECTION = ? ORDER BY R_NO", (details.schoolId, details.grade, details.section))
-    students_table = cursor.fetchall()
     
-    # Convert to list of dictionaries
-    students_table = [dict(zip(["R_NO", "GRADE", "SECTION", "STUDENT_NAME"], student)) for student in students_table]
+    # Construct the table name and enclose it in backticks
+    table_name = f"`Y{details.year}_{details.schoolId}`"
+    
+    # create_address_table_query = f"""
+    # CREATE TABLE IF NOT EXISTS {table_name} (
+    #             STUDENT_ID NVARCHAR(50),
+    #             STUDENT_NAME NVARCHAR(100),
+    #             GRADE NVARCHAR(10),
+    #             SECTION NVARCHAR(10),
+    #             R_NO INT,
+    #             FA1 FLOAT,
+    #             FA2 FLOAT,
+    #             SA1 FLOAT,
+    #             FA3 FLOAT,
+    #             FA4 FLOAT,
+    #             SA2 FLOAT,
+    #             CP FLOAT,
+    #             GD FLOAT
+    #         )
+    # """
+    # cursor.execute(create_address_table_query)
+    
 
-    return {"message": "Roll numbers generated successfully", "students": students_table}
+    
+    try:
+        
+        # Select rows from the new table where GRADE and SECTION match the provided details
+        select_new_table_query = f"""
+        SELECT STUDENT_ID
+        FROM {table_name}
+        WHERE GRADE = %s AND SECTION = %s
+        """
+        cursor.execute(select_new_table_query, (details.grade, details.section))
+        new_rows = cursor.fetchall()
+        print(new_rows)
+        # Update each row with a unique roll number starting from 1
+        roll_number = 1
+        for new_row in new_rows:
+            update_query = f"""
+            UPDATE {table_name}
+            SET R_NO = %s
+            WHERE STUDENT_ID = %s
+            """
+            cursor.execute(update_query, (roll_number, new_row[0]))
+            roll_number += 1
+        
+        db.commit()
+        return {"message": "Roll numbers generated successfully"}
+    except mysql.connector.Error as err:
+        db.rollback()  # Rollback in case of error
+        return {"message": "Error inserting data", "error": str(err)}
+
+app.include_router(rl_router)

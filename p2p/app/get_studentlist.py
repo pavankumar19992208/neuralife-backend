@@ -1,58 +1,39 @@
-# from fastapi import APIRouter, HTTPException, Depends
-# from db import get_db1
-# import pyodbc
-# from pydantic import BaseModel
-
-# class student_details(BaseModel):
-#     schoolId: str
-#     grade: str
-#     section: str
-
-# std_router = APIRouter()
-
-
-
-# @std_router.post("/stdetails")
-# async def get_student_details(details: student_details, db=Depends(get_db1)):
-#     cursor = db.cursor()
-#     cursor.execute("SELECT * FROM students WHERE SCHOOL_ID = ? AND GRADE = ? AND SECTION = ?", (details.schoolId, details.grade, details.section))
-#     students_table = cursor.fetchall()
-#     print(students_table)
-#     students_table = [dict(zip(["SCHOOL_ID","STUDENT_ID", "STUDENT_NAME", "GRADE", "SECTION","","","","","","", "PASSWORD","R_NO"], student)) for student in students_table]
-#     print(students_table)
-#     return {"students": students_table}
-
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Depends
+from db import get_db1
 from pydantic import BaseModel
-import random
-import string
+import mysql.connector
 
-class student_details(BaseModel):
+class StudentDetails(BaseModel):
+    year: str
     schoolId: str
     grade: str
     section: str
 
 std_router = APIRouter()
 
-def random_string(length: int):
-    letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(length))
-
-def random_name():
-    names = ["Aarav", "Vivaan", "Aditya", "Pranav", "Aryan", "Dhruv", "Arjun", "Atharv", "Rudra", "Sai"]
-    return random.choice(names)
-
 @std_router.post("/stdetails")
-async def get_student_details(details: student_details):
-    students_table = [
-        {
-            "SCHOOL_ID": details.schoolId,
-            "STUDENT_ID": "STCH{:06d}".format(random.randint(1, 999999)),
-            "STUDENT_NAME": random_name(),
-            "GRADE": details.grade,
-            "SECTION": details.section,
-            "PASSWORD": random_string(10),
-            "R_NO": random.randint(1, 100)
-        } for _ in range(5)
+async def get_student_details(details: StudentDetails):
+    table_name = f"Y{details.year}_{details.schoolId}"
+    print(table_name)
+    db = get_db1()
+    cursor = db.cursor()
+    
+    # Use %s as placeholders for MySQL
+    query = f"SELECT * FROM {table_name} WHERE GRADE = %s AND SECTION = %s"
+    cursor.execute(query, (details.grade, details.section))
+    
+    students_table = cursor.fetchall()
+    print(students_table)
+    
+    # Correct the column names in the zip function
+    column_names = ["STUDENT_ID", "STUDENT_NAME", "GRADE", "SECTION", "R_NO", "FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "CP", "GD"]
+    students_table = [dict(zip(column_names, student)) for student in students_table]
+    
+    # Filter out unwanted columns
+    filtered_students_table = [
+        {key: student[key] for key in ["STUDENT_ID", "STUDENT_NAME", "GRADE", "SECTION", "R_NO"]}
+        for student in students_table
     ]
-    return {"students": students_table}
+    
+    print(filtered_students_table)
+    return {"students": filtered_students_table}
