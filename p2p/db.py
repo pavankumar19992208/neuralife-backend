@@ -1,29 +1,19 @@
-
-import pyodbc
-import mysql.connector
-
-def get_db():
-    conn_str = (
-        r'DRIVER={ODBC Driver 18 for SQL Server};'
-        r'SERVER=tcp:p2ptrail.database.windows.net,1433;'
-        r'DATABASE=p2p_trail;'
-        r'UID=p2padmin;'
-        r'PWD=Techworks@1234'
-    )
-    cnxn = pyodbc.connect(conn_str)
-    return cnxn
-
-
 import mysql.connector
 
 def get_db1():
-    conn = mysql.connector.connect(
-        host="p2ptechworks.cr6yco4g2jh4.eu-north-1.rds.amazonaws.com",
-        user="p2p_admin",  # Replace with your RDS username
-        password="Amma9502",  # Replace with your RDS password
-        database="p2p_data"  # Replace with your RDS database name
-    )
-    return conn
+    try:
+        connection = mysql.connector.connect(
+            host='localhost',
+            user='root',  # replace with your MySQL username
+            password='Amma@9502',  # replace with your MySQL password
+            database='p2p_data'  # replace with your MySQL database name
+        )
+        if connection.is_connected():
+            print("Connected to MySQL database")
+            return connection
+    except Error as e:
+        print(f"Error while connecting to MySQL: {e}")
+        return None
 
 def get_db2():
     config = {

@@ -8,7 +8,6 @@ class StudentDetails(BaseModel):
     schoolId: str
     grade: str
     section: str
-
 std_router = APIRouter()
 
 @std_router.post("/stdetails")
