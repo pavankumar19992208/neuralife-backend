@@ -9,8 +9,9 @@ from app.st_login import stl_router
 from app.get_studentlist import std_router
 from app.upload_marks import upm_router
 from app.acreport import acreport_router
+from app.homework import homework_router
 from fastapi.middleware.cors import CORSMiddleware
-
+from webpage.StudentRegistration import studentregistration_router
 app = FastAPI(docs_url="/docs")
 
 origins = [
@@ -40,3 +41,5 @@ app.include_router(std_router)
 app.include_router(rl_router)
 app.include_router(upm_router)
 app.include_router(acreport_router)
+app.include_router(studentregistration_router)
+app.include_router(homework_router)
