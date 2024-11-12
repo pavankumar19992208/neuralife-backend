@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 import mysql.connector
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from datetime import date
 import json
 
@@ -18,6 +18,16 @@ class HomeworkDetails(BaseModel):
     CreatedAt: date
     DueDate: date
     UpdatedBy: str
+
+class AttendanceDetails(BaseModel):
+    student_id: int
+    date: date
+    status: str
+    remarks: Optional[str] = None
+    recorded_by: str
+
+class AttendanceList(BaseModel):
+    attendance: List[AttendanceDetails]
 
 @homework_router.post("/homework")
 async def create_homework(details: HomeworkDetails, db=Depends(get_db1)):
@@ -97,7 +107,7 @@ async def create_homework(details: HomeworkDetails, db=Depends(get_db1)):
         insert_currenthw_query = """
         INSERT INTO currenthw (
             H_id, SchoolId, class_, sec, subject, HomeWork, CreatedAt, DueDate, UpdatedBy
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         print("Parameters for insert:", (
             last_inserted_id, details.SchoolId, details.Class_, details.Sec, details.Subject, json.dumps(details.HomeWork),
@@ -112,3 +122,41 @@ async def create_homework(details: HomeworkDetails, db=Depends(get_db1)):
     db.commit()
     
     return {"message": "Homework created/updated successfully"}
+
+@homework_router.post("/attendance")
+async def create_attendance(details: AttendanceList, db=Depends(get_db1)):
+    cursor = db.cursor()
+    
+    # Create attendance table if not exists
+    create_attendance_table_query = """
+    CREATE TABLE IF NOT EXISTS attendance (
+        attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT,
+        date DATE,
+        status ENUM('P', 'AB'),
+        remarks TEXT,
+        recorded_by VARCHAR(255)
+    )
+    """
+    
+    cursor.execute(create_attendance_table_query)
+    
+    # Insert values into attendance table
+    insert_attendance_query = """
+    INSERT INTO attendance (
+        student_id, date, status, remarks, recorded_by
+    ) VALUES (%s, %s, %s, %s, %s)
+    """
+    
+    for record in details.attendance:
+        # Ensure status is either 'P' or 'AB'
+        if record.status not in ['P', 'AB']:
+            raise HTTPException(status_code=400, detail=f"Invalid status value: {record.status}")
+        
+        cursor.execute(insert_attendance_query, (
+            record.student_id, record.date, record.status, record.remarks, record.recorded_by
+        ))
+    
+    db.commit()
+    
+    return {"message": "Attendance records created successfully"}
