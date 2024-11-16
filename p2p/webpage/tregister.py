@@ -10,6 +10,7 @@ teacher_router = APIRouter()
 class TeacherRegistration(BaseModel):
     SchoolId: str
     fullName: str
+    profilepic: str
     dob: str
     gender: str
     contactNumber: str
@@ -44,6 +45,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         teacherid INT AUTO_INCREMENT PRIMARY KEY,
         SchoolId VARCHAR(255),
         fullName VARCHAR(255),
+        profilepic VARCHAR(255),
         dob DATE,
         gender VARCHAR(10),
         contactNumber VARCHAR(20),
@@ -74,14 +76,14 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     # Insert values into teachers table
     insert_teacher_query = """
     INSERT INTO teachers (
-        SchoolId, fullName, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
+        SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
         subjectSpecialization, grade, experience, qualification, certifications, joiningDate, employmentType,
         otherEmploymentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
         languagesKnown, interests, availabilityOfExtraCirricularActivities, documents
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
-        details.SchoolId, details.fullName, details.dob, details.gender, details.contactNumber, details.email,
+        details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
         json.dumps(details.currentAddress), json.dumps(details.permanentAddress), details.position,
         json.dumps(details.subjectSpecialization), details.grade, details.experience, details.qualification,
         details.certifications, details.joiningDate, details.employmentType, details.otherEmploymentType,

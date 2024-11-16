@@ -46,12 +46,8 @@ async def generate_roll_numbers(details: RollNumberDetails):
     #             GD FLOAT
     #         )
     # """
-    # cursor.execute(create_address_table_query)
-    
-
-    
-    try:
-        
+    # cursor.execute(create_address_table_query)    
+    try:    
         # Select rows from the new table where GRADE and SECTION match the provided details
         select_new_table_query = f"""
         SELECT STUDENT_ID
