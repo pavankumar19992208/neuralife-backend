@@ -17,8 +17,8 @@ class SchoolInternalData(BaseModel):
     GradeLevelTo: str
     Subjects: List[str]
     Medium: str
-    AcademicYearStart: str
-    AcademicYearEnd: str
+    AcademicYearStart: str  # Format: YYYY-MM
+    AcademicYearEnd: str    # Format: YYYY-MM
     ExtraPrograms: List[str]
     SchoolTimingFrom: str
     SchoolTimingTo: str
@@ -28,6 +28,8 @@ class SchoolInternalData(BaseModel):
     OtherAssessmentCriteria: str
     FeeStructure: List[Dict[str, str]]
     TotalAmount: float
+    TeachingStaff: List[str]
+    NonTeachingStaff: List[str]
 
 class SchoolIdRequest(BaseModel):
     SchoolId: str
@@ -49,8 +51,8 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
         GradeLevelTo VARCHAR(255),
         Subjects JSON,
         Medium VARCHAR(255),
-        AcademicYearStart DATE,
-        AcademicYearEnd DATE,
+        AcademicYearStart VARCHAR(10),  # Format: YYYY-MM
+        AcademicYearEnd VARCHAR(10),    # Format: YYYY-MM
         ExtraPrograms JSON,
         SchoolTimingFrom TIME,
         SchoolTimingTo TIME,
@@ -59,7 +61,9 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
         AssessmentCriteria VARCHAR(255),
         OtherAssessmentCriteria VARCHAR(255),
         FeeStructure JSON,
-        TotalAmount FLOAT
+        TotalAmount FLOAT,
+        TeachingStaff JSON,
+        NonTeachingStaff JSON
     )
     """
     cursor.execute(create_schooldata_table_query)
@@ -69,8 +73,8 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
     INSERT INTO schooldata (
         SchoolId, State, SchoolType, Curriculum, OtherCurriculum, GradeLevelFrom, GradeLevelTo, Subjects, Medium,
         AcademicYearStart, AcademicYearEnd, ExtraPrograms, SchoolTimingFrom, SchoolTimingTo, ExamPattern,
-        OtherExamPattern, AssessmentCriteria, OtherAssessmentCriteria, FeeStructure, TotalAmount
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        OtherExamPattern, AssessmentCriteria, OtherAssessmentCriteria, FeeStructure, TotalAmount, TeachingStaff, NonTeachingStaff
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_schooldata_query, (
         details.SchoolId, details.State, details.SchoolType, details.Curriculum, details.OtherCurriculum,
@@ -78,7 +82,7 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
         details.AcademicYearStart, details.AcademicYearEnd, json.dumps(details.ExtraPrograms),
         details.SchoolTimingFrom, details.SchoolTimingTo, details.ExamPattern, details.OtherExamPattern,
         details.AssessmentCriteria, details.OtherAssessmentCriteria, json.dumps(details.FeeStructure),
-        details.TotalAmount
+        details.TotalAmount, json.dumps(details.TeachingStaff), json.dumps(details.NonTeachingStaff)
     ))
     
     db.commit()
@@ -101,6 +105,8 @@ async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1
         row['Subjects'] = json.loads(row['Subjects'])
         row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
         row['FeeStructure'] = json.loads(row['FeeStructure'])
+        row['TeachingStaff'] = json.loads(row['TeachingStaff'])
+        row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
         return {"message": "School info retrieved successfully", "data": row}
     else:
         raise HTTPException(status_code=404, detail="School data not found")
