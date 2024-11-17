@@ -32,7 +32,7 @@ class TeacherRegistration(BaseModel):
     relationshipToTeacher: str
     languagesKnown: List[str]
     interests: str
-    availabilityOfExtraCirricularActivities: bool
+    availabilityOfExtraCirricularActivities: str
     documents: Dict[str, str]
 
 @teacher_router.post("/registerteacher")
@@ -67,7 +67,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         relationshipToTeacher VARCHAR(50),
         languagesKnown JSON,
         interests TEXT,
-        availabilityOfExtraCirricularActivities BOOLEAN,
+        availabilityOfExtraCirricularActivities VARCHAR(255),
         documents JSON
     )
     """
