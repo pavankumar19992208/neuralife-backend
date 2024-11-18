@@ -1,9 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 from pydantic import BaseModel
+from datetime import date
 import mysql.connector
 from typing import List, Dict
 import json
+import secrets
+import string
 
 teacher_router = APIRouter()
 
@@ -11,19 +14,19 @@ class TeacherRegistration(BaseModel):
     SchoolId: str
     fullName: str
     profilepic: str
-    dob: str
+    dob: date
     gender: str
     contactNumber: str
     email: str
     currentAddress: Dict[str, str]
     permanentAddress: Dict[str, str]
-    position: str
-    subjectSpecialization: List[str]
+    position: List[str]  # Changed to List[str]
+    subjectSpecialization: Dict[str, List[str]]  # Changed to Dict[str, List[str]]
     grade: str
-    experience: str
+    experience: int
     qualification: str
     certifications: str
-    joiningDate: str
+    joiningDate: date
     employmentType: str
     otherEmploymentType: str
     previousSchool: str
@@ -34,6 +37,11 @@ class TeacherRegistration(BaseModel):
     interests: str
     availabilityOfExtraCirricularActivities: str
     documents: Dict[str, str]
+
+def generate_password(length=8):
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(secrets.choice(characters) for i in range(length))
+    return password
 
 @teacher_router.post("/registerteacher")
 async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
@@ -52,7 +60,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         email VARCHAR(255),
         currentAddress JSON,
         permanentAddress JSON,
-        position VARCHAR(255),
+        position JSON,
         subjectSpecialization JSON,
         grade VARCHAR(50),
         experience INT,
@@ -68,10 +76,14 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         languagesKnown JSON,
         interests TEXT,
         availabilityOfExtraCirricularActivities VARCHAR(255),
-        documents JSON
+        documents JSON,
+        password VARCHAR(255)
     )
     """
     cursor.execute(create_teachers_table_query)
+    
+    # Generate a password
+    generated_password = generate_password()
     
     # Insert values into teachers table
     insert_teacher_query = """
@@ -79,19 +91,19 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
         subjectSpecialization, grade, experience, qualification, certifications, joiningDate, employmentType,
         otherEmploymentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
-        languagesKnown, interests, availabilityOfExtraCirricularActivities, documents
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
         details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
-        json.dumps(details.currentAddress), json.dumps(details.permanentAddress), details.position,
+        json.dumps(details.currentAddress), json.dumps(details.permanentAddress), json.dumps(details.position),
         json.dumps(details.subjectSpecialization), details.grade, details.experience, details.qualification,
         details.certifications, details.joiningDate, details.employmentType, details.otherEmploymentType,
         details.previousSchool, details.emergencyContactName, details.emergencyContactNumber,
         details.relationshipToTeacher, json.dumps(details.languagesKnown), details.interests,
-        details.availabilityOfExtraCirricularActivities, json.dumps(details.documents)
+        details.availabilityOfExtraCirricularActivities, json.dumps(details.documents), generated_password
     ))
     
     db.commit()
     
-    return {"message": f"{details.fullName} was registered successfully"}
+    return {"message": f"{details.fullName} was registered successfully", "password": generated_password}
