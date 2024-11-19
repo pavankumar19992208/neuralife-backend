@@ -7,6 +7,8 @@ import string
 from typing import List, Dict, Optional
 from datetime import date
 import json
+import secrets
+import string
 
 studentregistration_router = APIRouter()
 
@@ -40,6 +42,11 @@ class StudentRegistration(BaseModel):
     Password: Optional[str] = None
     ParentOccupation: Optional[str] = None
     ParentQualification: Optional[str] = None
+
+def generate_password(length=8):
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(secrets.choice(characters) for i in range(length))
+    return password
 
 def generate_user_id(mobile_number: str, db):
     cursor = db.cursor()
@@ -101,6 +108,10 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
 
     # Generate UserId
     user_id = generate_user_id(details.MobileNumber, db)
+
+    # Generate Password if not provided
+    if not details.Password:
+        details.Password = generate_password()
 
     # Insert student details into the database
     insert_query = """
