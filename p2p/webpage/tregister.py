@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import date
 import mysql.connector
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 import secrets
 import string
@@ -11,44 +11,43 @@ import string
 teacher_router = APIRouter()
 
 class Address(BaseModel):
-    line1: str
-    line2: str
-    city: str
-    district: str
-    state: str
-    pincode: str
+    line1: Optional[str] = None
+    line2: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
 
 class Documents(BaseModel):
-    resume: str
-    photoID: str
-    educationalCertificates: str
+    resume: Optional[str] = None
+    photoID: Optional[str] = None
+    educationalCertificates: Optional[str] = None
 
 class TeacherRegistration(BaseModel):
-    SchoolId: str
-    fullName: str
-    profilepic: str
-    dob: date
-    gender: str
-    contactNumber: str
-    email: str
-    currentAddress: Address
-    permanentAddress: Address
-    position: List[str]
-    subjectSpecialization: Dict[str, List[str]]
-    experience: int
-    qualification: str
-    certifications: str
-    joiningDate: date
-    employmentType: str
-    otherEmploymentType: str = None
-    previousSchool: str
-    emergencyContactName: str
-    emergencyContactNumber: str
-    relationshipToTeacher: str
-    languagesKnown: List[str]
-    interests: str
-    availabilityOfExtraCirricularActivities: str
-    documents: Documents
+    SchoolId: Optional[str] = None
+    fullName: Optional[str] = None
+    profilepic: Optional[str] = None
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+    contactNumber: Optional[str] = None
+    email: Optional[EmailStr] = None
+    currentAddress: Optional[Address] = None
+    permanentAddress: Optional[Address] = None
+    position: Optional[List[str]] = None
+    subjectSpecialization: Optional[Dict[str, List[str]]] = None
+    experience: Optional[int] = None
+    qualification: Optional[str] = None
+    certifications: Optional[str] = None
+    joiningDate: Optional[date] = None
+    employmentType: Optional[str] = None
+    previousSchool: Optional[str] = None
+    emergencyContactName: Optional[str] = None
+    emergencyContactNumber: Optional[str] = None
+    relationshipToTeacher: Optional[str] = None
+    languagesKnown: Optional[List[str]] = None
+    interests: Optional[str] = None
+    availabilityOfExtraCirricularActivities: Optional[str] = None
+    documents: Optional[Documents] = None
 
 def generate_password(length=8):
     characters = string.ascii_letters + string.digits + string.punctuation
@@ -79,7 +78,6 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         certifications TEXT,
         joiningDate DATE,
         employmentType VARCHAR(50),
-        otherEmploymentType VARCHAR(50),
         previousSchool VARCHAR(255),
         emergencyContactName VARCHAR(255),
         emergencyContactNumber VARCHAR(20),
@@ -100,19 +98,20 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     insert_teacher_query = """
     INSERT INTO teachers (
         SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
-        subjectSpecialization,experience, qualification, certifications, joiningDate, employmentType,
-        otherEmploymentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
+        subjectSpecialization, experience, qualification, certifications, joiningDate, employmentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
         languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
         details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
-        json.dumps(details.currentAddress.dict()), json.dumps(details.permanentAddress.dict()), json.dumps(details.position),
-        json.dumps(details.subjectSpecialization),details.experience, details.qualification,
-        details.certifications, details.joiningDate, details.employmentType, details.otherEmploymentType,
-        details.previousSchool, details.emergencyContactName, details.emergencyContactNumber,
-        details.relationshipToTeacher, json.dumps(details.languagesKnown), details.interests,
-        details.availabilityOfExtraCirricularActivities, json.dumps(details.documents.dict()), generated_password
+        json.dumps(details.currentAddress.dict()) if details.currentAddress else None,
+        json.dumps(details.permanentAddress.dict()) if details.permanentAddress else None,
+        json.dumps(details.position) if details.position else None,
+        json.dumps(details.subjectSpecialization) if details.subjectSpecialization else None,
+        details.experience, details.qualification, details.certifications, details.joiningDate, details.employmentType, details.previousSchool, details.emergencyContactName, details.emergencyContactNumber,
+        details.relationshipToTeacher, json.dumps(details.languagesKnown) if details.languagesKnown else None,
+        details.interests, details.availabilityOfExtraCirricularActivities,
+        json.dumps(details.documents.dict()) if details.documents else None, generated_password
     ))
     
     db.commit()
