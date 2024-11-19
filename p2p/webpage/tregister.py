@@ -10,6 +10,19 @@ import string
 
 teacher_router = APIRouter()
 
+class Address(BaseModel):
+    line1: str
+    line2: str
+    city: str
+    district: str
+    state: str
+    pincode: str
+
+class Documents(BaseModel):
+    resume: str
+    photoID: str
+    educationalCertificates: str
+
 class TeacherRegistration(BaseModel):
     SchoolId: str
     fullName: str
@@ -18,17 +31,16 @@ class TeacherRegistration(BaseModel):
     gender: str
     contactNumber: str
     email: str
-    currentAddress: Dict[str, str]
-    permanentAddress: Dict[str, str]
-    position: List[str]  # Changed to List[str]
-    subjectSpecialization: Dict[str, List[str]]  # Changed to Dict[str, List[str]]
-    grade: str
+    currentAddress: Address
+    permanentAddress: Address
+    position: List[str]
+    subjectSpecialization: Dict[str, List[str]]
     experience: int
     qualification: str
     certifications: str
     joiningDate: date
     employmentType: str
-    otherEmploymentType: str
+    otherEmploymentType: str = None
     previousSchool: str
     emergencyContactName: str
     emergencyContactNumber: str
@@ -36,7 +48,7 @@ class TeacherRegistration(BaseModel):
     languagesKnown: List[str]
     interests: str
     availabilityOfExtraCirricularActivities: str
-    documents: Dict[str, str]
+    documents: Documents
 
 def generate_password(length=8):
     characters = string.ascii_letters + string.digits + string.punctuation
@@ -62,7 +74,6 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         permanentAddress JSON,
         position JSON,
         subjectSpecialization JSON,
-        grade VARCHAR(50),
         experience INT,
         qualification VARCHAR(255),
         certifications TEXT,
@@ -89,19 +100,19 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     insert_teacher_query = """
     INSERT INTO teachers (
         SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
-        subjectSpecialization, grade, experience, qualification, certifications, joiningDate, employmentType,
+        subjectSpecialization,experience, qualification, certifications, joiningDate, employmentType,
         otherEmploymentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
         languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
         details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
-        json.dumps(details.currentAddress), json.dumps(details.permanentAddress), json.dumps(details.position),
-        json.dumps(details.subjectSpecialization), details.grade, details.experience, details.qualification,
+        json.dumps(details.currentAddress.dict()), json.dumps(details.permanentAddress.dict()), json.dumps(details.position),
+        json.dumps(details.subjectSpecialization),details.experience, details.qualification,
         details.certifications, details.joiningDate, details.employmentType, details.otherEmploymentType,
         details.previousSchool, details.emergencyContactName, details.emergencyContactNumber,
         details.relationshipToTeacher, json.dumps(details.languagesKnown), details.interests,
-        details.availabilityOfExtraCirricularActivities, json.dumps(details.documents), generated_password
+        details.availabilityOfExtraCirricularActivities, json.dumps(details.documents.dict()), generated_password
     ))
     
     db.commit()
