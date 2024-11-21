@@ -62,6 +62,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     create_teachers_table_query = """
     CREATE TABLE IF NOT EXISTS teachers (
         teacherid INT AUTO_INCREMENT PRIMARY KEY,
+        userid VARCHAR(255),
         SchoolId VARCHAR(255),
         fullName VARCHAR(255),
         profilepic VARCHAR(255),
@@ -94,16 +95,19 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     # Generate a password
     generated_password = generate_password()
     
+    # Generate userid
+    userid = f"T{details.contactNumber}"
+    
     # Insert values into teachers table
     insert_teacher_query = """
     INSERT INTO teachers (
-        SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
+        userid, SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
         subjectSpecialization, experience, qualification, certifications, joiningDate, employmentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
         languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
-        details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
+        userid, details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
         json.dumps(details.currentAddress.dict()) if details.currentAddress else None,
         json.dumps(details.permanentAddress.dict()) if details.permanentAddress else None,
         json.dumps(details.position) if details.position else None,
@@ -116,4 +120,4 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     
     db.commit()
     
-    return {"message": f"{details.fullName} was registered successfully", "password": generated_password}
+    return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}

@@ -1,7 +1,6 @@
 from fastapi import FastAPI, APIRouter
 from webpage.sch_registration import sch_router
 from webpage.sch_login import schl_router
-from webpage.tea_registration import tea_router
 from app.tea_login import tl_router
 from app.roll_no import rl_router
 from app.st_login import stl_router
@@ -34,7 +33,6 @@ def read_root():
 # Your routes go here
 app.include_router(sch_router)
 app.include_router(schl_router)
-app.include_router(tea_router)
 app.include_router(tl_router)
 app.include_router(stl_router)
 app.include_router(std_router)
