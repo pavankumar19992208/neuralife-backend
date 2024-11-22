@@ -57,8 +57,7 @@ def generate_password(length=8):
 @teacher_router.post("/registerteacher")
 async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor = db.cursor()
-    
-    # Create teachers table if not exists
+        # Create teachers table if not exists
     create_teachers_table_query = """
     CREATE TABLE IF NOT EXISTS teachers (
         teacherid INT AUTO_INCREMENT PRIMARY KEY,
@@ -91,6 +90,15 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     )
     """
     cursor.execute(create_teachers_table_query)
+    # Check if contactNumber already exists
+    check_contact_query = "SELECT fullName FROM teachers WHERE contactNumber = %s"
+    cursor.execute(check_contact_query, (details.contactNumber,))
+    existing_teacher = cursor.fetchone()
+    
+    if existing_teacher:
+        return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
+    
+
     
     # Generate a password
     generated_password = generate_password()

@@ -11,6 +11,7 @@ from webpage.tregister import teacher_router
 from app.homework import homework_router
 from fastapi.middleware.cors import CORSMiddleware
 from webpage.schooldata import school_data
+from webpage.classtimetable import ct_router
 from webpage.StudentRegistration import studentregistration_router
 app = FastAPI(docs_url="/docs")
 
@@ -43,3 +44,4 @@ app.include_router(studentregistration_router)
 app.include_router(homework_router)
 app.include_router(school_data)
 app.include_router(teacher_router)
+app.include_router(ct_router)
