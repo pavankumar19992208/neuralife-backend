@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 import mysql.connector
 from pydantic import BaseModel
+import json
 
 tl_router = APIRouter()
 
@@ -17,7 +18,7 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     
     cursor = db.cursor()
     
-    cursor.execute("SELECT * FROM teachers WHERE TEACHER_ID = %s AND PASSWORD = %s", (teacherId, password))
+    cursor.execute("SELECT * FROM teachers WHERE userid = %s AND password = %s", (teacherId, password))
     teacher_row = cursor.fetchone()
     
     if teacher_row is None:
@@ -26,18 +27,18 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     
     teacher_dict = {column[0]: value for column, value in zip(cursor.description, teacher_row)}
     
-    cursor.execute("SELECT TEACHER_NAME FROM teachers WHERE TEACHER_ID = %s", (teacherId,))
+    cursor.execute("SELECT fullName FROM teachers WHERE userid = %s", (teacherId,))
     teacher_details = cursor.fetchone()
     
-    cursor.execute("SELECT SUBJECT FROM subjects WHERE TEACHER_ID = %s", (teacherId,))
-    subjects = [row[0] for row in cursor.fetchall()]
+    cursor.execute("SELECT subjectSpecialization FROM teachers WHERE userid = %s", (teacherId,))
+    subject_specialization = cursor.fetchone()[0]
     
-    cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (teacher_row[0],))  # Assuming SCHOOL_ID is the third column
+    cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (teacher_row[2],))  # Assuming SCHOOL_ID is the third column
     school_name = cursor.fetchone()[0]
     
     teacher_dict.update({
         "SCHOOL_NAME": school_name,
-        "subjects": subjects
+        "subjectSpecialization": json.loads(subject_specialization)
     })
     print(teacher_dict)
     return {"message": "Login successful", "teacher": teacher_dict}
