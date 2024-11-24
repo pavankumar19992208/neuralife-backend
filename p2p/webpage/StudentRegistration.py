@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 import mysql.connector
@@ -11,10 +11,10 @@ import json
 studentregistration_router = APIRouter()
 
 class StudentRegistration(BaseModel):
-    SchoolId: Optional[int] = 1  # Default value set to 1
+    SchoolId: Optional[int] = Field(default=1, alias="SchoolId")
     StudentName: Optional[str] = None
     DOB: Optional[date] = None
-    Gender: Optional[str] = None  # Changed to str for compatibility with varchar(10)
+    Gender: Optional[str] = None
     Photo: Optional[str] = None
     Grade: Optional[int] = None
     PreviousSchool: Optional[str] = None
@@ -32,12 +32,9 @@ class StudentRegistration(BaseModel):
     CurrentAddress: Optional[Dict[str, str]] = None
     PermanentAddress: Optional[Dict[str, str]] = None
     PreviousPercentage: Optional[float] = None
-    TransferCertificate: Optional[str] = None
     BloodGroup: Optional[str] = None
     MedicalDisability: Optional[str] = None
     Documents: Optional[Dict[str, str]] = None
-    PaymentDetails: Optional[Dict[str, str]] = None
-    Password: Optional[str] = None
     ParentOccupation: Optional[str] = None
     ParentQualification: Optional[str] = None
 
@@ -46,6 +43,11 @@ def generate_user_id(mobile_number: str, db):
     cursor.execute("SELECT COUNT(*) FROM student WHERE MobileNumber = %s", (mobile_number,))
     count = cursor.fetchone()[0]
     return f"S{mobile_number}" if count == 0 else f"S{mobile_number}{count}"
+
+def generate_random_password(length=8):
+    characters = string.ascii_letters + string.digits
+    password = ''.join(random.choice(characters) for i in range(length))
+    return password
 
 @studentregistration_router.post("/registerstudent")
 async def register_student(details: StudentRegistration, db=Depends(get_db1)):
@@ -75,7 +77,6 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
         CurrentAddress JSON,
         PermanentAddress JSON,
         PreviousPercentage FLOAT,
-        TransferCertificate VARCHAR(255),
         BloodGroup VARCHAR(10),
         MedicalDisability VARCHAR(255),
         Documents JSON,
@@ -93,31 +94,32 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
         student_name = existing_student[0]
         return {"message": f"Aadhar number {details.AadharNumber} already exists with {student_name}"}
 
-    
-
     # Ensure SchoolId is set to 1
     details.SchoolId = 1
 
     # Generate UserId
     user_id = generate_user_id(details.MobileNumber, db)
 
+    # Generate random password
+    random_password = generate_random_password()
+
     # Insert student details into the database
     insert_query = """
     INSERT INTO student (
         SchoolId, StudentName, DOB, Gender, Photo, Grade, PreviousSchool, LanguagesKnown, Religion, Category,
         MotherName, FatherName, Nationality, AadharNumber, GuardianName, MobileNumber, Email, EmergencyContact,
-        CurrentAddress, PermanentAddress, PreviousPercentage, TransferCertificate, BloodGroup, MedicalDisability,
+        CurrentAddress, PermanentAddress, PreviousPercentage,BloodGroup, MedicalDisability,
         Documents, Password, UserId, ParentOccupation, ParentQualification
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_query, (
         details.SchoolId, details.StudentName, details.DOB, details.Gender, details.Photo, details.Grade, details.PreviousSchool,
         json.dumps(details.LanguagesKnown), details.Religion, details.Category, details.MotherName, details.FatherName,
         details.Nationality, details.AadharNumber, details.GuardianName, details.MobileNumber, details.Email, details.EmergencyContact,
-        json.dumps(details.CurrentAddress), json.dumps(details.PermanentAddress), details.PreviousPercentage, details.TransferCertificate,
-        details.BloodGroup, details.MedicalDisability, json.dumps(details.Documents), details.Password, user_id, details.ParentOccupation, details.ParentQualification
+        json.dumps(details.CurrentAddress), json.dumps(details.PermanentAddress), details.PreviousPercentage,
+        details.BloodGroup, details.MedicalDisability, json.dumps(details.Documents), random_password, user_id, details.ParentOccupation, details.ParentQualification
     ))
 
     db.commit()
 
-    return {"message": "Registered", "UserId": user_id, "Password": details.Password}
+    return {"message": "Registered", "UserId": user_id, "Password": random_password}
