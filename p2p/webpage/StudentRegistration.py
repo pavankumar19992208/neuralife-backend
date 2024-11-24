@@ -34,7 +34,7 @@ class StudentRegistration(BaseModel):
     CurrentAddress: Optional[Dict[str, str]] = None
     PermanentAddress: Optional[Dict[str, str]] = None
     PreviousPercentage: Optional[float] = None
-    TransferCertificate: Optional[str] = None
+    # TransferCertificate: Optional[str] = None
     BloodGroup: Optional[str] = None
     MedicalDisability: Optional[str] = None
     Documents: Optional[Dict[str, str]] = None
@@ -82,7 +82,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
         CurrentAddress JSON,
         PermanentAddress JSON,
         PreviousPercentage FLOAT,
-        TransferCertificate VARCHAR(255),
+        
         BloodGroup VARCHAR(10),
         MedicalDisability VARCHAR(255),
         Documents JSON,
@@ -117,15 +117,15 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     INSERT INTO student (
         SchoolId, StudentName, DOB, Gender, Photo, Grade, PreviousSchool, LanguagesKnown, Religion, Category,
         MotherName, FatherName, Nationality, AadharNumber, GuardianName, MobileNumber, Email, EmergencyContact,
-        CurrentAddress, PermanentAddress, PreviousPercentage, TransferCertificate, BloodGroup, MedicalDisability,
+        CurrentAddress, PermanentAddress, PreviousPercentage, BloodGroup, MedicalDisability,
         Documents, Password, UserId, ParentOccupation, ParentQualification
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_query, (
         details.SchoolId, details.StudentName, details.DOB, details.Gender, details.Photo, details.Grade, details.PreviousSchool,
         json.dumps(details.LanguagesKnown), details.Religion, details.Category, details.MotherName, details.FatherName,
         details.Nationality, details.AadharNumber, details.GuardianName, details.MobileNumber, details.Email, details.EmergencyContact,
-        json.dumps(details.CurrentAddress), json.dumps(details.PermanentAddress), details.PreviousPercentage, details.TransferCertificate,
+        json.dumps(details.CurrentAddress), json.dumps(details.PermanentAddress), details.PreviousPercentage,
         details.BloodGroup, details.MedicalDisability, json.dumps(details.Documents), details.Password, user_id, details.ParentOccupation, details.ParentQualification
     ))
 
