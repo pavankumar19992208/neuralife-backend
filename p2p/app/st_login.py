@@ -16,7 +16,7 @@ async def teacher_login(student: StudentLogin, db=Depends(get_db1)):
     print(studentId, password)
 
     cursor = db.cursor()
-    cursor.execute(f"SELECT * FROM students WHERE STUDENT_ID = '{studentId}' AND PASSWORD = '{password}'")
+    cursor.execute(f"SELECT * FROM student WHERE StudentId = '{studentId}' AND Password = '{password}'")
     row = cursor.fetchone()
     student_dict = {column[0]: value for column, value in zip(cursor.description, row)}
     cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (row[0],))  # Assuming SCHOOL_ID is the third column
