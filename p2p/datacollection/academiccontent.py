@@ -22,6 +22,7 @@ class AcademicContent(BaseModel):
     subject: str
     chapterscount: int
     chapters: List[str]
+    exercises: List[str]
 
 @academic_router.post("/addtitles")
 async def add_titles(content: AcademicContent):
@@ -32,7 +33,9 @@ async def add_titles(content: AcademicContent):
                 content.grade: {
                     content.subject: {
                         "chaptercount": content.chapterscount,
-                        "chapters": {chapter: {} for chapter in content.chapters}
+                        "chapters": {
+                            chapter: {"exercise": exercise} for chapter, exercise in zip(content.chapters, content.exercises)
+                        }
                     }
                 }
             }
