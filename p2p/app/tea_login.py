@@ -18,7 +18,7 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     
     cursor = db.cursor()
     
-    cursor.execute("SELECT * FROM teachers WHERE userid = %s AND password = %s", (teacherId, password))
+    cursor.execute("SELECT * FROM teachers WHERE UserId = %s AND password = %s", (teacherId, password))
     teacher_row = cursor.fetchone()
     
     if teacher_row is None:
@@ -27,7 +27,7 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     
     teacher_dict = {column[0]: value for column, value in zip(cursor.description, teacher_row)}
     
-    cursor.execute("SELECT fullName FROM teachers WHERE userid = %s", (teacherId,))
+    cursor.execute("SELECT Name FROM teachers WHERE userid = %s", (teacherId,))
     teacher_details = cursor.fetchone()
     
     cursor.execute("SELECT subjectSpecialization FROM teachers WHERE userid = %s", (teacherId,))
@@ -38,7 +38,34 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
     
     teacher_dict.update({
         "SCHOOL_NAME": school_name,
+        "user_type": "teacher",
         "subjectSpecialization": json.loads(subject_specialization)
     })
     print(teacher_dict)
     return {"message": "Login successful", "teacher": teacher_dict}
+
+
+@tl_router.post("/testerlogin")
+async def teacher_login(tester: TeacherLogin, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
+    teacherId = tester.userId
+    password = tester.password
+    print(teacherId, password)
+    
+    cursor = db.cursor()
+    
+    cursor.execute("SELECT * FROM  slinkedinusers WHERE UserId = %s", (teacherId,))
+    tester_row = cursor.fetchone()
+    
+    if tester_row is None:
+        print("Not found")
+        raise HTTPException(status_code=400, detail="Invalid userId")
+    
+    tester_dict = {column[0]: value for column, value in zip(cursor.description, tester_row)}
+    
+
+    tester_dict.update({
+        "SCHOOL_NAME": "tester_school",
+        "user_type": "tester",
+    })
+    print(tester_dict)
+    return {"message": "Login successful", "teacher": tester_dict}
