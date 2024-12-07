@@ -24,6 +24,7 @@ async def teacher_login(student: StudentLogin, db=Depends(get_db1)):
 
     student_dict.update({
         "SCHOOL_NAME": school_name,
+        "user_type": "student",
     })
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid teacherId or password")
