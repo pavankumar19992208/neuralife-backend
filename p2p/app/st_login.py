@@ -16,16 +16,17 @@ async def teacher_login(student: StudentLogin, db=Depends(get_db1)):
     print(studentId, password)
 
     cursor = db.cursor()
-    cursor.execute(f"SELECT * FROM students WHERE STUDENT_ID = '{studentId}' AND PASSWORD = '{password}'")
+    cursor.execute(f"SELECT * FROM student WHERE UserId = '{studentId}' AND Password = '{password}'")
     row = cursor.fetchone()
     student_dict = {column[0]: value for column, value in zip(cursor.description, row)}
-    cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (row[0],))  # Assuming SCHOOL_ID is the third column
+    cursor.execute("SELECT SCHOOL_NAME FROM schools WHERE SCHOOL_ID = %s", (row[1],))  # Assuming SCHOOL_ID is the third column
     school_name = cursor.fetchone()[0]
 
     student_dict.update({
         "SCHOOL_NAME": school_name,
+        "user_type": "student",
     })
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid teacherId or password")
 
-    return {"message": "Login successful", "student":student_dict}
+    return {"message": "Login successful", "user":student_dict}

@@ -9,9 +9,15 @@ from app.upload_marks import upm_router
 from app.acreport import acreport_router
 from webpage.tregister import teacher_router
 from app.homework import homework_router
+from app.slinkedin.chats import chat_router
+from app.slinkedin.postmanagement import post_router
+from datacollection.academiccontent import academic_router
 from fastapi.middleware.cors import CORSMiddleware
 from webpage.schooldata import school_data
+from app.slinkedin.friendrequesthandling import friend_request_router
+from webpage.classtimetable import ct_router
 from webpage.StudentRegistration import studentregistration_router
+from app.slinkedin.fetchdata import SLinkedInUserrouter
 app = FastAPI(docs_url="/docs")
 
 origins = [
@@ -43,3 +49,9 @@ app.include_router(studentregistration_router)
 app.include_router(homework_router)
 app.include_router(school_data)
 app.include_router(teacher_router)
+app.include_router(ct_router)
+app.include_router(academic_router)
+app.include_router(SLinkedInUserrouter)
+app.include_router(post_router)
+app.include_router(friend_request_router)
+app.include_router(chat_router)
