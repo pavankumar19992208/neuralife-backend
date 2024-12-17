@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Query, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends ,Query
 from pydantic import BaseModel
 import mysql.connector
 from db import get_db1
@@ -13,6 +13,9 @@ class UserData(BaseModel):
 class UserName(BaseModel):
     UserId: str
     userName: str
+
+class UserIdRequest(BaseModel):
+    UserId: str
 
 @SLinkedInUserrouter.get("/search")
 def search_users(query: str = Query(...), db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
@@ -94,6 +97,16 @@ async def update_username(user: UserName, db: mysql.connector.connection.MySQLCo
     
     return {"message": "Username updated successfully"}
 
-# Add the router to your main application
-app = FastAPI()
-app.include_router(SLinkedInUserrouter)
+@SLinkedInUserrouter.post("/profiledata")
+async def profile_data(user_id_request: UserIdRequest, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    
+    # Fetch the user data with the given UserId
+    cursor.execute("SELECT * FROM slinkedinusers WHERE UserId = %s", (user_id_request.UserId,))
+    user_row = cursor.fetchone()
+    
+    if not user_row:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return user_row
+

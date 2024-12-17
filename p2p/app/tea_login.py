@@ -42,7 +42,7 @@ async def teacher_login(teacher: TeacherLogin, db: mysql.connector.connection.My
         "subjectSpecialization": json.loads(subject_specialization)
     })
     print(teacher_dict)
-    return {"message": "Login successful", "teacher": teacher_dict}
+    return {"message": "Login successful", "user": teacher_dict}
 
 
 @tl_router.post("/testerlogin")
@@ -68,4 +68,4 @@ async def teacher_login(tester: TeacherLogin, db: mysql.connector.connection.MyS
         "user_type": "tester",
     })
     print(tester_dict)
-    return {"message": "Login successful", "teacher": tester_dict}
+    return {"message": "Login successful", "user": tester_dict}

@@ -29,4 +29,4 @@ async def teacher_login(student: StudentLogin, db=Depends(get_db1)):
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid teacherId or password")
 
-    return {"message": "Login successful", "student":student_dict}
+    return {"message": "Login successful", "user":student_dict}
