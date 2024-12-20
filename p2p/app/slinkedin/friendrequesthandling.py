@@ -47,7 +47,7 @@ async def fetch_friend_requests(user_id_request: UserIdRequest, db: mysql.connec
     friend_ids = cursor.fetchall()
     print(friend_ids)
     if not friend_ids:
-        return []
+        return [] 
     
     friend_profiles = []
     for friend_id in friend_ids:

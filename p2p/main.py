@@ -9,6 +9,7 @@ from app.upload_marks import upm_router
 from app.acreport import acreport_router
 from webpage.tregister import teacher_router
 from app.homework import homework_router
+from app.slinkedin.chatdata import chatdata_router
 from app.slinkedin.chats import chat_router
 from app.slinkedin.postmanagement import post_router
 from datacollection.academiccontent import academic_router
@@ -55,3 +56,4 @@ app.include_router(SLinkedInUserrouter)
 app.include_router(post_router)
 app.include_router(friend_request_router)
 app.include_router(chat_router)
+app.include_router(chatdata_router)
