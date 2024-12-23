@@ -24,8 +24,8 @@ jobs:
 
     - name: Build and push Docker image
       run: |
-        docker build -t your-dockerhub-username/my-fastapi-app .
-        docker push your-dockerhub-username/my-fastapi-app
+        docker build -t pavankumar19992208/p2p .
+        docker push Amma@9502/p2p
 
     - name: SSH to EC2 and deploy
       uses: appleboy/ssh-action@v0.1.5
