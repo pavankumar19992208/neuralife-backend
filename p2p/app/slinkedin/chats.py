@@ -14,13 +14,13 @@ class CreateChatRequest(BaseModel):
     UserId2: str
 
 class AddMessageRequest(BaseModel):
-    ChatId: int
+    ChatId: str
     SenderId: str
     Content: str
     MessageType: str
 
 class GetMessagesRequest(BaseModel):
-    ChatId: int
+    ChatId: str
 
 class CreateCircleRequest(BaseModel):
     CircleName: str
@@ -34,21 +34,26 @@ class GetCirclesRequest(BaseModel):
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: dict[str, List[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, chat_id: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if chat_id not in self.active_connections:
+            self.active_connections[chat_id] = []
+        self.active_connections[chat_id].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, chat_id: str):
+        self.active_connections[chat_id].remove(websocket)
+        if not self.active_connections[chat_id]:
+            del self.active_connections[chat_id]
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+    async def broadcast(self, message: str, chat_id: str):
+        if chat_id in self.active_connections:
+            for connection in self.active_connections[chat_id]:
+                await connection.send_text(message)
 
 manager = ConnectionManager()
 
@@ -76,7 +81,7 @@ async def create_chat(request: CreateChatRequest, db: mysql.connector.connection
     db.commit()
     
     # Get the ChatId of the newly inserted chat
-    chat_id = cursor.lastrowid
+    chat_id = f"ch{cursor.lastrowid}"
     
     # Create the chats column in slinkedinusers table if it does not exist
     cursor.execute("SHOW COLUMNS FROM slinkedinusers LIKE 'chats'")
@@ -115,7 +120,7 @@ async def add_message(request: AddMessageRequest, db: mysql.connector.connection
     create_messages_table_query = """
     CREATE TABLE IF NOT EXISTS Messages (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        ChatId INT,
+        ChatId VARCHAR(255),
         SenderId VARCHAR(255),
         Content TEXT,
         MessageType ENUM('text', 'image', 'file'),
@@ -135,12 +140,23 @@ async def add_message(request: AddMessageRequest, db: mysql.connector.connection
     ))
     db.commit()
     
+    # Broadcast the new message to all connected clients in the chat
+    message_data = {
+        "ChatId": request.ChatId,
+        "SenderId": request.SenderId,
+        "Content": request.Content,
+        "MessageType": request.MessageType,
+        "CreatedAt": datetime.now().isoformat(),
+        "Is_Read": False
+    }
+    await manager.broadcast(json.dumps(message_data), request.ChatId)
+    
     return {"message": "Message added successfully"}
 
 @chat_router.post("/getmessages")
 async def get_messages(request: GetMessagesRequest, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
-    
+    print("chatid", request.ChatId)
     # Fetch messages from the Messages table based on ChatId
     cursor.execute("SELECT * FROM Messages WHERE ChatId = %s ORDER BY CreatedAt ASC", (request.ChatId,))
     messages = cursor.fetchall()
@@ -207,21 +223,25 @@ async def get_circles(request: GetCirclesRequest, db: mysql.connector.connection
     cursor.execute(f"SELECT * FROM Circles WHERE ChatId IN ({format_strings})", tuple(request.ChatIds))
     circles = cursor.fetchall()
     
+    # Fetch the latest message and its time for each circle
+    for circle in circles:
+        cursor.execute("SELECT Content, CreatedAt FROM Messages WHERE ChatId = %s ORDER BY CreatedAt DESC LIMIT 1", (circle['ChatId'],))
+        latest_message = cursor.fetchone()
+        circle['LatestMessage'] = latest_message['Content'] if latest_message else ''
+        circle['MessageTime'] = latest_message['CreatedAt'] if latest_message else ''
+    
     if not circles:
         return ""
     
     return circles
 
 @chat_router.websocket("/ws/chat/{chat_id}")
-async def websocket_endpoint(websocket: WebSocket, chat_id: int):
-    await manager.connect(websocket)
+async def websocket_endpoint(websocket: WebSocket, chat_id: str):
+    await manager.connect(websocket, chat_id)
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.broadcast(f"Chat {chat_id}: {data}")
+            await manager.broadcast(data, chat_id)
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast(f"Chat {chat_id}: Client disconnected")
-
-# Add the router to your main application
-app.include_router(chat_router)
+        manager.disconnect(websocket, chat_id)
+        await manager.broadcast(f"Chat {chat_id}: Client disconnected", chat_id)
