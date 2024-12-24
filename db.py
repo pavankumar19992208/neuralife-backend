@@ -4,9 +4,9 @@ from mysql.connector import Error
 def get_db1():
     try:
         connection = mysql.connector.connect(
-            host='34.72.131.9',
-            user='root',  # replace with your MySQL username
-            password='devtest@123',  # replace with your MySQL password
+            host='neuralife.cdequ68uc3xr.eu-north-1.rds.amazonaws.com',
+            user='admin',  # replace with your MySQL username
+            password='neuraLife2024',  # replace with your MySQL password
             database='neuraLife'  # replace with your MySQL database name
         )
         if connection.is_connected():
