@@ -10,7 +10,7 @@ def get_db1():
             database='neuraLife'  # replace with your MySQL database name
         )
         if connection.is_connected():
-            print("Connected to MySQL database")
+            print("aws Connected to MySQL database")
             return connection
     except Error as e:
         print(f"Error while connecting to MySQL: {e}")
