@@ -39,6 +39,7 @@ jobs:
           docker rm my-fastapi-app || true
           docker run -d -p 80:8000 --name my-fastapi-app pavankumar19992208/neuralife-backend
 
+          
     - name: Output instance URL
       run: |
         echo "Application is deployed and running at: http://${{ secrets.EC2_HOST }}"
