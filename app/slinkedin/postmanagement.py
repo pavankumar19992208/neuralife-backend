@@ -16,6 +16,7 @@ class PostData(BaseModel):
     Privacy: str
     TimeStamp: str
     Location: Optional[str] = None
+    FriendsList: str
 
 class PostIds(BaseModel):
     post_ids: List[int]
@@ -78,8 +79,35 @@ async def add_post(post: PostData, db: mysql.connector.connection.MySQLConnectio
         """
         cursor.execute(update_user_query, (json.dumps(current_posts), new_posts_count, post.UserId))
         db.commit()
-    
-    return {"message": "Post has been successfully delivered"}
+
+    # Ensure the feed column exists in the slinkedinusers table
+    cursor.execute("SHOW COLUMNS FROM slinkedinusers LIKE 'feed'")
+    result = cursor.fetchone()
+    if not result:
+        cursor.execute("ALTER TABLE slinkedinusers ADD COLUMN feed JSON")
+        db.commit()
+
+    # Update the feed for the user and their friends
+    friends_list = json.loads(post.FriendsList)
+    friends_list.append(post.UserId)  # Include the main user in the feed update
+
+    for friend_id in friends_list:
+        cursor.execute("SELECT feed FROM slinkedinusers WHERE UserId = %s", (friend_id,))
+        friend_data = cursor.fetchone()
+
+        if friend_data:
+            current_feed = json.loads(friend_data['feed']) if friend_data['feed'] else []
+            current_feed.append(post_id)
+
+            update_feed_query = """
+            UPDATE slinkedinusers
+            SET feed = %s
+            WHERE UserId = %s
+            """
+            cursor.execute(update_feed_query, (json.dumps(current_feed), friend_id))
+            db.commit()
+
+    return {"message": "Post has been successfully delivered", "post_id": post_id}
 
 @post_router.post("/fetchposts")
 async def fetch_posts(post_ids: PostIds, db: mysql.connector.connection.MySQLConnection = Depends(get_db1)):
