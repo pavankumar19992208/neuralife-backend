@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import mysql.connector
-from db import get_db1
+from shared.db import get_db1
 import json
 
 post_router = APIRouter()

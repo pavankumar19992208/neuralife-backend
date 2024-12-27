@@ -22,10 +22,10 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker image
+    - name: Build and push Docker images
       run: |
-        docker build -t pavankumar19992208/neuralife-backend .
-        docker push pavankumar19992208/neuralife-backend
+        docker-compose build
+        docker-compose push
 
     - name: SSH to EC2 and deploy
       uses: appleboy/ssh-action@v0.1.5
@@ -34,12 +34,10 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_KEY }}
         script: |
-          docker pull pavankumar19992208/neuralife-backend
-          docker stop my-fastapi-app || true
-          docker rm my-fastapi-app || true
-          docker run -d -p 80:8000 --name my-fastapi-app pavankumar19992208/neuralife-backend
+          docker-compose pull
+          docker-compose down
+          docker-compose up -d
 
-          
     - name: Output instance URL
       run: |
         echo "Application is deployed and running at: http://${{ secrets.EC2_HOST }}"

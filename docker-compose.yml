@@ -1,0 +1,35 @@
+# filepath: /docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  datacollection:
+    build:
+      context: ./datacollection
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db
+
+  webpage:
+    build:
+      context: ./webpage
+    ports:
+      - "8002:8002"
+    depends_on:
+      - db
+
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: yourdbname
+    ports:
+      - "3306:3306"
