@@ -24,11 +24,3 @@ services:
       - "8002:8002"
     depends_on:
       - db
-
-  db:
-    image: mysql:5.7
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: yourdbname
-    ports:
-      - "3306:3306"
