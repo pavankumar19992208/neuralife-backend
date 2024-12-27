@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from shared.db import get_db1
+from db import get_db1
 import mysql.connector
 from pydantic import BaseModel
 

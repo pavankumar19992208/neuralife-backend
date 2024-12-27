@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends ,Query
 from pydantic import BaseModel
 import mysql.connector
-from shared.db import get_db1
+from db import get_db1
 
 SLinkedInUserrouter = APIRouter()
 

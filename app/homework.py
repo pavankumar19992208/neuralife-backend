@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
-from shared.db import get_db1
+from db import get_db1
 import mysql.connector
 from typing import Optional, Dict, List
 from datetime import date

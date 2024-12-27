@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from shared.db import get_db1
+from db import get_db1
 import pyodbc
 from pydantic import BaseModel
 

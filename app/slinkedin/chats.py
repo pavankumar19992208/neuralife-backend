@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 import mysql.connector
-from shared.db import get_db1
+from db import get_db1
 import json
 from datetime import datetime
 from typing import List
