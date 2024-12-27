@@ -1,17 +1,17 @@
 # filepath: /app/main.py
 from fastapi import FastAPI
-from app.tea_login import tl_router
-from app.roll_no import rl_router
-from app.st_login import stl_router
-from app.get_studentlist import std_router
-from app.upload_marks import upm_router
-from app.acreport import acreport_router
-from app.homework import homework_router
-from app.slinkedin.chatdata import chatdata_router
-from app.slinkedin.chats import chat_router
-from app.slinkedin.postmanagement import post_router
-from app.slinkedin.friendrequesthandling import friend_request_router
-from app.slinkedin.fetchdata import SLinkedInUserrouter
+from tea_login import tl_router
+from roll_no import rl_router
+from st_login import stl_router
+from get_studentlist import std_router
+from upload_marks import upm_router
+from acreport import acreport_router
+from homework import homework_router
+from slinkedin.chatdata import chatdata_router
+from slinkedin.chats import chat_router
+from slinkedin.postmanagement import post_router
+from slinkedin.friendrequesthandling import friend_request_router
+from slinkedin.fetchdata import SLinkedInUserrouter
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(docs_url="/docs")

@@ -1,6 +1,6 @@
 # filepath: /datacollection/main.py
 from fastapi import FastAPI
-from datacollection.academiccontent import academic_router
+from academiccontent import academic_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(docs_url="/docs")

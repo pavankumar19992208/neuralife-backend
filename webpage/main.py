@@ -1,11 +1,11 @@
 # filepath: /webpage/main.py
 from fastapi import FastAPI
-from webpage.sch_registration import sch_router
-from webpage.sch_login import schl_router
-from webpage.tregister import teacher_router
-from webpage.schooldata import school_data
-from webpage.classtimetable import ct_router
-from webpage.StudentRegistration import studentregistration_router
+from sch_registration import sch_router
+from sch_login import schl_router
+from tregister import teacher_router
+from schooldata import school_data
+from classtimetable import ct_router
+from StudentRegistration import studentregistration_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(docs_url="/docs")
