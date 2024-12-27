@@ -4,13 +4,13 @@ from mysql.connector import Error
 def get_db1():
     try:
         connection = mysql.connector.connect(
-            host='neuralife.cdequ68uc3xr.eu-north-1.rds.amazonaws.com',
-            user='admin',  # replace with your MySQL username
-            password='neuraLife2024',  # replace with your MySQL password
+            host='34.72.131.9',
+            user='root',  # replace with your MySQL username
+            password='devtest@123',  # replace with your MySQL password
             database='neuraLife'  # replace with your MySQL database name
         )
         if connection.is_connected():
-            print("aws Connected to MySQL database")
+            print("Connected to MySQL database")
             return connection
     except Error as e:
         print(f"Error while connecting to MySQL: {e}")
