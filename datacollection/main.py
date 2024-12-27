@@ -5,9 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(docs_url="/docs")
 
-origins = [
-    "*",  # Allow all origins
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,5 +19,8 @@ app.add_middleware(
 def read_root():
     return {"Hello": "World"}
 
-# Your routes go here
 app.include_router(academic_router)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
