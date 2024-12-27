@@ -41,6 +41,7 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         script: |
           cd /home/ec2-user/neuralife-backend  # Change to the directory where docker-compose.yml is located
+          git pull origin main
           sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version

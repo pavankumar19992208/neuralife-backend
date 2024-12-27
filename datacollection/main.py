@@ -17,7 +17,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Segment": "Data Collection"}
 
 app.include_router(academic_router)
 
