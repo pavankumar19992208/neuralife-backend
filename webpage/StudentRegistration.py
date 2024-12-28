@@ -54,7 +54,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     cursor = db.cursor()
     
     # Check if Aadhar number already exists
-    cursor.execute("SELECT StudentName FROM student WHERE AadharNumber = %s", (details.AadharNumber,))
+    cursor.execute("SELECT Name FROM student WHERE AadharNumber = %s", (details.AadharNumber,))
     existing_student = cursor.fetchone()
     if existing_student:
         student_name = existing_student[0]
@@ -65,7 +65,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     CREATE TABLE IF NOT EXISTS student (
         StudentId INT AUTO_INCREMENT PRIMARY KEY,
         SchoolId INT,
-        StudentName VARCHAR(255),
+        Name VARCHAR(255),
         DOB DATE,
         Gender VARCHAR(10),
         Photo VARCHAR(255),
@@ -108,7 +108,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     # Insert student details into the database
     insert_query = """
     INSERT INTO student (
-        SchoolId, StudentName, DOB, Gender, Photo, Grade, PreviousSchool, LanguagesKnown, Religion, Category,
+        SchoolId, Name, DOB, Gender, Photo, Grade, PreviousSchool, LanguagesKnown, Religion, Category,
         MotherName, FatherName, Nationality, AadharNumber, GuardianName, MobileNumber, Email, EmergencyContact,
         CurrentAddress, PermanentAddress, PreviousPercentage,BloodGroup, MedicalDisability,
         Documents,Password, UserId, ParentOccupation, ParentQualification
