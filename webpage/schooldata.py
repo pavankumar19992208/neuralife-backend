@@ -110,3 +110,29 @@ async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1
         return {"message": "School info retrieved successfully", "data": row}
     else:
         raise HTTPException(status_code=404, detail="School data not found")
+
+@school_data.get("/grades-and-subjects")
+async def get_grades_and_subjects(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    
+    # Query to get distinct grades and subjects
+    get_grades_query = "SELECT DISTINCT GradeLevelFrom, GradeLevelTo FROM schooldata"
+    cursor.execute(get_grades_query)
+    grades = cursor.fetchall()
+    
+    get_subjects_query = "SELECT DISTINCT Subjects FROM schooldata"
+    cursor.execute(get_subjects_query)
+    subjects = cursor.fetchall()
+    
+    # Process the results
+    grade_list = []
+    for grade in grades:
+        grade_list.append(f"{grade['GradeLevelFrom']} - {grade['GradeLevelTo']}")
+    print(grade_list)
+    subject_list = []
+    for subject in subjects:
+        subject_list.extend(json.loads(subject['Subjects']))
+    print(subject_list)
+    subject_list = list(set(subject_list))  # Remove duplicates
+    
+    return {"grades": grade_list, "subjects": subject_list}
