@@ -63,8 +63,8 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         teacherid INT AUTO_INCREMENT PRIMARY KEY,
         userid VARCHAR(255),
         SchoolId VARCHAR(255),
-        fullName VARCHAR(255),
-        profilepic VARCHAR(255),
+        Name VARCHAR(255),
+        photo VARCHAR(255),
         dob DATE,
         gender VARCHAR(10),
         contactNumber VARCHAR(20),
@@ -91,7 +91,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     """
     cursor.execute(create_teachers_table_query)
     # Check if contactNumber already exists
-    check_contact_query = "SELECT fullName FROM teachers WHERE contactNumber = %s"
+    check_contact_query = "SELECT Name FROM teachers WHERE contactNumber = %s"
     cursor.execute(check_contact_query, (details.contactNumber,))
     existing_teacher = cursor.fetchone()
     
@@ -109,7 +109,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     # Insert values into teachers table
     insert_teacher_query = """
     INSERT INTO teachers (
-        userid, SchoolId, fullName, profilepic, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
+        userid, SchoolId, Name, photo, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
         subjectSpecialization, experience, qualification, certifications, joiningDate, employmentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
         languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
