@@ -19,6 +19,7 @@ from app.slinkedin.friendrequesthandling import friend_request_router
 from webpage.classtimetable import ct_router
 from webpage.StudentRegistration import studentregistration_router
 from app.slinkedin.fetchdata import SLinkedInUserrouter
+from webpage.subjectSpecialization import allocation_router
 app = FastAPI(docs_url="/docs")
 
 origins = [
@@ -57,3 +58,4 @@ app.include_router(post_router)
 app.include_router(friend_request_router)
 app.include_router(chat_router)
 app.include_router(chatdata_router)
+app.include_router(allocation_router)
