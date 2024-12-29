@@ -1,0 +1,45 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      run: |
+        docker build -t pavankumar19992208/neuralife-backend .
+        docker push pavankumar19992208/neuralife-backend
+
+    - name: SSH to EC2 and deploy
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          docker pull pavankumar19992208/neuralife-backend
+          docker stop my-fastapi-app || true
+          docker rm my-fastapi-app || true
+          docker run -d -p 80:8000 --name my-fastapi-app pavankumar19992208/neuralife-backend
+
+          
+    - name: Output instance URL
+      run: |
+        echo "Application is deployed and running at: http://${{ secrets.EC2_HOST }}"
