@@ -50,14 +50,15 @@ class TeacherRegistration(BaseModel):
     documents: Optional[Documents] = None
 
 def generate_password(length=8):
-    characters = string.ascii_letters + string.digits + string.punctuation
+    characters = string.ascii_letters + string.digits
     password = ''.join(secrets.choice(characters) for i in range(length))
     return password
 
 @teacher_router.post("/registerteacher")
 async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor = db.cursor()
-        # Create teachers table if not exists
+    
+    # Create teachers table if not exists
     create_teachers_table_query = """
     CREATE TABLE IF NOT EXISTS teachers (
         teacherid INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,15 +91,14 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     )
     """
     cursor.execute(create_teachers_table_query)
+    
     # Check if contactNumber already exists
     check_contact_query = "SELECT Name FROM teachers WHERE contactNumber = %s"
     cursor.execute(check_contact_query, (details.contactNumber,))
     existing_teacher = cursor.fetchone()
     
-    if existing_teacher:
-        return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
-    
-
+    # if existing_teacher:
+    #     return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
     
     # Generate a password
     generated_password = generate_password()
@@ -126,6 +126,79 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         json.dumps(details.documents.dict()) if details.documents else None, generated_password
     ))
     
+    # Create staffallocation table if not exists
+    create_staffallocation_table_query = """
+    CREATE TABLE IF NOT EXISTS staffallocation (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        schoolid VARCHAR(255),
+        subject VARCHAR(255),
+        nursery JSON,
+        LKG JSON,
+        UKG JSON,
+        class_1 JSON,
+        class_2 JSON,
+        class_3 JSON,
+        class_4 JSON,
+        class_5 JSON,
+        class_6 JSON,
+        class_7 JSON,
+        class_8 JSON,
+        class_9 JSON,
+        class_10 JSON,
+        class_11 JSON,
+        class_12 JSON
+    )
+    """
+    cursor.execute(create_staffallocation_table_query)
+    x=[]
+    y=[]
+    for subject, classes in details.subjectSpecialization.items():
+        y.append(subject)
+        for i in classes:
+            x.append(i)
+    x=set(x)
+    print(x,y)
+
+    # Insert subjects and initialize class cells with empty dict format
+    for subject in x:
+        print(subject, classes)
+        insert_staffallocation_query = """
+        INSERT INTO staffallocation (
+            schoolid, subject, nursery, LKG, UKG, class_1, class_2, class_3, class_4, class_5, class_6, class_7, class_8, class_9, class_10, class_11, class_12
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_staffallocation_query, (
+            details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+        ))
+    
+    # # Update staffallocation table with teacherid in teacherlist for each class
+    # for subject, classes in details.subjectSpecialization.items():
+    #     for class_name in classes:
+    #         update_staffallocation_query = """
+    #         UPDATE staffallocation
+    #         SET {class_name} = JSON_SET({class_name}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({class_name}, '$.teacherlist'), '$', %s))
+    #         WHERE schoolid = %s AND subject = %s
+    #         """
+    #         cursor.execute(update_staffallocation_query.format(class_name=class_name), (userid, details.SchoolId, subject))
+    # Update staffallocation table with teacherid in teacherlist for each class
+    for clas in y:
+        clas = clas.replace(" ", "_")
+        clas = clas.lower()
+        for subject in x:
+            update_staffallocation_query = """
+            UPDATE staffallocation
+            SET {clas} = JSON_SET({clas}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({clas}, '$.teacherlist'), '$', %s))
+            WHERE schoolid = %s AND subject = %s
+            """
+            cursor.execute(update_staffallocation_query.format(clas=clas), (userid, details.SchoolId, subject))
+        
     db.commit()
     
     return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}
