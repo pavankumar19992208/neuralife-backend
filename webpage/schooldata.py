@@ -141,4 +141,4 @@ async def get_grades_and_subjects(school_id_request: SchoolIdRequest, db=Depends
         subject_list.extend(json.loads(subject['Subjects']))
     subject_list = list(set(subject_list))  # Remove duplicates
     
-    return {"grades": grade_list, "subjects": subject_list, "all_classes": all_classes}
+    return {"subjects": subject_list, "grades": all_classes}
