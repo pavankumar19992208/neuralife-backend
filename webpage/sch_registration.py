@@ -27,7 +27,7 @@ sch_router = APIRouter()
 
 @sch_router.post("/schregister")
 async def register_school(school: SchoolRegistration):
-    PASSWORD = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    PASSWORD = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
     db = get_db1()
     cursor = db.cursor()
 
