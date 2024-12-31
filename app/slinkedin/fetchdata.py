@@ -1,7 +1,8 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends ,Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 import mysql.connector
 from db import get_db1
+import json
 
 SLinkedInUserrouter = APIRouter()
 
@@ -63,18 +64,23 @@ async def fetch_user(user: UserData, db: mysql.connector.connection.MySQLConnect
     user_row = cursor.fetchone()
     
     if user_row:
+        if user_row['friends_list']:
+            user_row['friends_list'] = json.loads(user_row['friends_list'])
         return user_row
     
     insert_user_query = """
     INSERT INTO slinkedinusers (UserId, Name, user_type, friends_count, friends_list, posts, posts_count, UserName)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """
-    cursor.execute(insert_user_query, (user.UserId, user.Name, user.user_type, 0, None, None, 0, None))
+    cursor.execute(insert_user_query, (user.UserId, user.Name, user.user_type, 0, json.dumps([]), json.dumps([]), 0, None))
     db.commit()
     
     # Fetch the newly inserted user
     cursor.execute("SELECT * FROM slinkedinusers WHERE UserId = %s", (user.UserId,))
     new_user_row = cursor.fetchone()
+    
+    if new_user_row['friends_list']:
+        new_user_row['friends_list'] = json.loads(new_user_row['friends_list'])
     
     return new_user_row
 
@@ -108,5 +114,7 @@ async def profile_data(user_id_request: UserIdRequest, db: mysql.connector.conne
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
     
+    if user_row['friends_list']:
+        user_row['friends_list'] = json.loads(user_row['friends_list'])
+    
     return user_row
-
