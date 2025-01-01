@@ -21,26 +21,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mydatacollection-deployment
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mydatacollection
-  template:
-    metadata:
-      labels:
-        app: mydatacollection
-    spec:
-      containers:
-      - name: mydatacollection
-        image: nerualifebackend.azurecr.io/mydatacollection:latest
-        ports:
-        - containerPort: 8001
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   name: mywebpage-deployment
 spec:
   replicas: 1
@@ -55,5 +35,25 @@ spec:
       containers:
       - name: mywebpage
         image: nerualifebackend.azurecr.io/mywebpage:latest
+        ports:
+        - containerPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mydatacollection-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mydatacollection
+  template:
+    metadata:
+      labels:
+        app: mydatacollection
+    spec:
+      containers:
+      - name: mydatacollection
+        image: nerualifebackend.azurecr.io/mydatacollection:latest
         ports:
         - containerPort: 8002

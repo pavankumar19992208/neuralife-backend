@@ -36,8 +36,9 @@ jobs:
     - name: Build and push Docker images
       run: |
         docker buildx build --push --tag nerualifebackend.azurecr.io/myapp:latest ./app
-        docker buildx build --push --tag nerualifebackend.azurecr.io/mydatacollection:latest ./datacollection
         docker buildx build --push --tag nerualifebackend.azurecr.io/mywebpage:latest ./webpage
+        docker buildx build --push --tag nerualifebackend.azurecr.io/mydatacollection:latest ./datacollection
+
 
     - name: Deploy to AKS
       run: |
