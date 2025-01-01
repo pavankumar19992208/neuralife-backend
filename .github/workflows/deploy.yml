@@ -27,7 +27,7 @@ jobs:
 
     - name: Set up AKS credentials
       run: |
-        az aks get-credentials --resource-group neuraLife --name neuralife-backend --location East Us
+        az aks get-credentials --resource-group neuraLife --name neuralife-backend --location eastus
 
     - name: Log in to Azure Container Registry
       run: |
