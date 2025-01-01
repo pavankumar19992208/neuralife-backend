@@ -6,7 +6,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - host: example.com
+  - host: nerualifebackend.eastus.cloudapp.azure.com
     http:
       paths:
       - path: /app
