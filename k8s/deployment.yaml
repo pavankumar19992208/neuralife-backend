@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: myacr.azurecr.io/myapp:latest
+        image: nerualifebackend.azurecr.io/myapp:latest
         ports:
         - containerPort: 8000
 ---
@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: mydatacollection
-        image: myacr.azurecr.io/mydatacollection:latest
+        image: nerualifebackend.azurecr.io/mydatacollection:latest
         ports:
         - containerPort: 8001
 ---
@@ -54,6 +54,6 @@ spec:
     spec:
       containers:
       - name: mywebpage
-        image: myacr.azurecr.io/mywebpage:latest
+        image: nerualifebackend.azurecr.io/mywebpage:latest
         ports:
         - containerPort: 8002
