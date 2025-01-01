@@ -17,7 +17,6 @@ spec:
         image: neuralifebackend.azurecr.io/myapp:latest
         ports:
         - containerPort: 8000
-
 ---
 apiVersion: apps/v1
 kind: Deployment
