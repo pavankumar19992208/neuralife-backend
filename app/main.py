@@ -29,7 +29,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {" segment ": " Mobile Application "}
+    return {" segment ": " Mobile application "}
 
 app.include_router(tl_router)
 app.include_router(stl_router)
