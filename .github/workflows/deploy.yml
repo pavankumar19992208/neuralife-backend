@@ -1,12 +1,12 @@
-name: Deploy to AWS EC2
+name: Deploy to AKS
 
 on:
   push:
     branches:
-      - main
+      - Azure-kubernetes
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,39 +16,30 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
 
-    - name: Install Docker Compose on Runner
+    - name: Install Azure CLI
       run: |
-        sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        sudo chmod +x /usr/local/bin/docker-compose
-        docker-compose --version
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v1
+    - name: Log in to Azure
+      uses: azure/login@v1
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Set up AKS credentials
+      run: |
+        az aks get-credentials --resource-group neuraLife --name neuralife-backend --location East Us
+
+    - name: Log in to Azure Container Registry
+      run: |
+        az acr login --name neuralifebackend
 
     - name: Build and push Docker images
       run: |
-        docker-compose build
-        docker-compose push
+        docker buildx build --push --tag neuralifebackend.azurecr.io/myapp:latest ./app
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mydatacollection:latest ./datacollection
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mywebpage:latest ./webpage
 
-    - name: SSH to EC2 and deploy
-      uses: appleboy/ssh-action@v0.1.5
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ec2-user
-        key: ${{ secrets.EC2_KEY }}
-        script: |
-          cd /home/ec2-user/neuralife-backend  # Change to the directory where docker-compose.yml is located
-          git pull origin main
-          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
-          docker-compose down
-          docker-compose build
-          docker-compose up -d
-
-    - name: Output instance URL
+    - name: Deploy to AKS
       run: |
-        echo "Application is deployed and running at: http://${{ secrets.EC2_HOST }}"
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
