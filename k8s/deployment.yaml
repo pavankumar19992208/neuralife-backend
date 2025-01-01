@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: myacr.azurecr.io/myapp:latest
+        ports:
+        - containerPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mydatacollection-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mydatacollection
+  template:
+    metadata:
+      labels:
+        app: mydatacollection
+    spec:
+      containers:
+      - name: mydatacollection
+        image: myacr.azurecr.io/mydatacollection:latest
+        ports:
+        - containerPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mywebpage-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mywebpage
+  template:
+    metadata:
+      labels:
+        app: mywebpage
+    spec:
+      containers:
+      - name: mywebpage
+        image: myacr.azurecr.io/mywebpage:latest
+        ports:
+        - containerPort: 8002
