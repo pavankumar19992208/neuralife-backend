@@ -45,7 +45,7 @@ jobs:
 
     - name: Uninstall Existing NGINX Ingress Controller
       run: |
-        helm uninstall nginx-ingress-new -n ingress-nginx || true
+        helm uninstall nginx-ingress-new -n default || true
 
     - name: Install NGINX Ingress Controller
       run: |
