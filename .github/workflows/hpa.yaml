@@ -36,15 +36,3 @@ spec:
   minReplicas: 1
   maxReplicas: 10
   targetCPUUtilizationPercentage: 50
-
-  # Log in to Azure
-#az login
-
-# Get AKS credentials
-#az aks get-credentials --resource-group neuraLife --name neuralife-backend
-
-# Verify the current context
-#kubectl config current-context
-
-# List the services
-#kubectl get services
