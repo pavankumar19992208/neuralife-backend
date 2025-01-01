@@ -31,13 +31,13 @@ jobs:
 
     - name: Log in to Azure Container Registry
       run: |
-        az acr login --name nerualifebackend
+        az acr login --name neuralifebackend
 
     - name: Build and push Docker images
       run: |
-        docker buildx build --push --tag nerualifebackend.azurecr.io/myapp:latest ./app
-        docker buildx build --push --tag nerualifebackend.azurecr.io/mywebpage:latest ./webpage
-        docker buildx build --push --tag nerualifebackend.azurecr.io/mydatacollection:latest ./datacollection
+        docker buildx build --push --tag neuralifebackend.azurecr.io/myapp:latest ./app
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mydatacollection:latest ./datacollection
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mywebpage:latest ./webpage
 
     - name: Install Helm
       run: |
@@ -54,4 +54,5 @@ jobs:
         kubectl apply -f k8s/deployment.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/ingress.yaml
+        kubectl apply -f k8s/hpa.yaml
         kubectl get services

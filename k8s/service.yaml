@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: myapp-service
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: myapp
   ports:
@@ -16,7 +16,7 @@ kind: Service
 metadata:
   name: mywebpage-service
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: mywebpage
   ports:
@@ -29,11 +29,10 @@ kind: Service
 metadata:
   name: mydatacollection-service
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: mydatacollection
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8002
-
