@@ -1,0 +1,39 @@
+# filepath: /c:/Users/PAVAN/startup/digital_schooling/new/P2P_BACKEND/k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  type: ClusterIP
+  selector:
+    app: myapp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mywebpage-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mywebpage
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mydatacollection-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mydatacollection
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8002
