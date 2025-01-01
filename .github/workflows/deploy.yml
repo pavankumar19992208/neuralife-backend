@@ -31,13 +31,13 @@ jobs:
 
     - name: Log in to Azure Container Registry
       run: |
-        az acr login --name nerualifebackend
+        az acr login --name neuralifebackend
 
     - name: Build and push Docker images
       run: |
-        docker buildx build --push --tag nerualifebackend.azurecr.io/myapp:latest ./app
-        docker buildx build --push --tag nerualifebackend.azurecr.io/mydatacollection:latest ./datacollection
-        docker buildx build --push --tag nerualifebackend.azurecr.io/mywebpage:latest ./webpage
+        docker buildx build --push --tag neuralifebackend.azurecr.io/myapp:latest ./app
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mydatacollection:latest ./datacollection
+        docker buildx build --push --tag neuralifebackend.azurecr.io/mywebpage:latest ./webpage
 
     - name: Install Helm
       run: |
@@ -51,7 +51,7 @@ jobs:
       run: |
         helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
         helm repo update
-        helm install nginx-ingress-new ingress-nginx/ingress-nginx --set controller.replicaCount=2 --set controller.ingressClass=nginx-new
+        helm install nginx-ingress-new ingress-nginx/ingress-nginx --set controller.replicaCount=2 --set controller.ingressClass=nginx-new --timeout 10m0s
 
     - name: Deploy to AKS
       run: |
