@@ -29,9 +29,16 @@ jobs:
       run: |
         az aks get-credentials --resource-group neuraLife --name neuralife-backend --overwrite-existing
 
+    - name: Get ACR Access Token
+      id: acr_login
+      run: |
+        az acr login --name neuralifebackend --expose-token > acr_token.json
+        echo "::set-output name=acr_username::00000000-0000-0000-0000-000000000000"
+        echo "::set-output name=acr_password::$(jq -r .accessToken acr_token.json)"
+
     - name: Log in to Azure Container Registry
       run: |
-        az acr login --name neuralifebackend
+        docker login neuralifebackend.azurecr.io --username ${{ steps.acr_login.outputs.acr_username }} --password ${{ steps.acr_login.outputs.acr_password }}
 
     - name: Build and push Docker images
       run: |
