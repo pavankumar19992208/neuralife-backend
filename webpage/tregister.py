@@ -97,8 +97,8 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor.execute(check_contact_query, (details.contactNumber,))
     existing_teacher = cursor.fetchone()
     
-    # if existing_teacher:
-    #     return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
+    if existing_teacher:
+        return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
     
     # Generate a password
     generated_password = generate_password()
