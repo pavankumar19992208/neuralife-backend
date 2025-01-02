@@ -17,18 +17,18 @@ services:
     depends_on:
       - db
 
-  datacollection:
-    build:
-      context: ./datacollection
-    ports:
-      - "8002:8002"
-    depends_on:
-      - db
-
   webpage:
     build:
       context: ./webpage
     ports:
       - "8001:8001"
+    depends_on:
+      - db
+      
+  datacollection:
+    build:
+      context: ./datacollection
+    ports:
+      - "8002:8002"
     depends_on:
       - db
