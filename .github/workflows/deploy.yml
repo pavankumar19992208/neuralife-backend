@@ -48,6 +48,9 @@ jobs:
 
     - name: Deploy to AKS
       run: |
+        kubectl apply -f k8s/nginx-ingress-serviceaccount.yaml
+        kubectl apply -f k8s/nginx-ingress-clusterrole.yaml
+        kubectl apply -f k8s/nginx-ingress-clusterrolebinding.yaml
         kubectl apply -f k8s/nginx-ingress-controller.yaml
         kubectl apply -f k8s/deployment.yaml
         kubectl apply -f k8s/service.yaml
