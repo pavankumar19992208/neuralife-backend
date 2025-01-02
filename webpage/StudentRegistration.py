@@ -11,7 +11,7 @@ import json
 studentregistration_router = APIRouter()
 
 class StudentRegistration(BaseModel):
-    SchoolId: Optional[int] = None  # Default value set to 1
+    SchoolId: Optional[str] = None
     StudentName: Optional[str] = None
     DOB: Optional[date] = None
     Gender: Optional[str] = None  # Changed to str for compatibility with varchar(10)
@@ -64,7 +64,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     create_table_query = """
     CREATE TABLE IF NOT EXISTS student (
         StudentId INT AUTO_INCREMENT PRIMARY KEY,
-        SchoolId INT,
+        SchoolId VARCHAR(50),
         Name VARCHAR(255),
         DOB DATE,
         Gender VARCHAR(10),
@@ -96,8 +96,6 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     """
     cursor.execute(create_table_query)
 
-    # Ensure SchoolId is set to 1
-    details.SchoolId = 1
 
     # Generate UserId
     user_id = generate_user_id(details.MobileNumber, db)
