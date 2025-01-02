@@ -157,7 +157,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
         for i in classes:
             x.append(i)
     x=set(x)
-    print(x,y)
+    # print(x,y)
 
     # Insert subjects and initialize class cells with empty dict format
     for subject in x:
