@@ -28,7 +28,6 @@ jobs:
     - name: Set up AKS credentials
       run: |
         az aks get-credentials --resource-group neuraLife --name neuralife-backend --overwrite-existing
-
     - name: Get ACR Access Token
       id: acr_login
       run: |
