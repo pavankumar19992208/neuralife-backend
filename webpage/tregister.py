@@ -167,16 +167,26 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
             schoolid, subject, nursery, LKG, UKG, class_1, class_2, class_3, class_4, class_5, class_6, class_7, class_8, class_9, class_10, class_11, class_12
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_staffallocation_query, (
-            details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-        ))
+        # Check if the subject already exists for the given SchoolId
+        check_subject_query = "SELECT 1 FROM staffallocation WHERE SchoolId = %s AND subject = %s"
+        cursor.execute(check_subject_query, (details.SchoolId, subject))
+        existing_subject = cursor.fetchone()
+        
+        # Perform the insertion if the subject does not exist
+        if not existing_subject:
+            cursor.execute(insert_staffallocation_query, (
+                details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            ))
+        
+        # Continue with the remaining code
+        # ...existing code...
     
     # # Update staffallocation table with teacherid in teacherlist for each class
     # for subject, classes in details.subjectSpecialization.items():
