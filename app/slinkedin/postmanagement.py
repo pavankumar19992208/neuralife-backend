@@ -16,7 +16,7 @@ class PostData(BaseModel):
     Privacy: str
     TimeStamp: str
     Location: Optional[str] = None
-    FriendsList: str
+    FriendsList: List[str]
 
 class PostIds(BaseModel):
     post_ids: List[int]
@@ -87,8 +87,8 @@ async def add_post(post: PostData, db: mysql.connector.connection.MySQLConnectio
         cursor.execute("ALTER TABLE slinkedinusers ADD COLUMN feed JSON")
         db.commit()
 
-    # Update the feed for the user and their friends
-    friends_list = json.loads(post.FriendsList)
+    # # Update the feed for the user and their friends
+    friends_list = post.FriendsList
     friends_list.append(post.UserId)  # Include the main user in the feed update
 
     for friend_id in friends_list:
