@@ -152,12 +152,14 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor.execute(create_staffallocation_table_query)
     x=[]
     y=[]
+    z=[]
     for subject, classes in details.subjectSpecialization.items():
         y.append(subject)
+        z.append(classes)
         for i in classes:
             x.append(i)
     x=set(x)
-    print(x,y)
+    print(x,y,z)
 
     # Insert subjects and initialize class cells with empty dict format
     for subject in x:
@@ -198,17 +200,19 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     #         """
     #         cursor.execute(update_staffallocation_query.format(class_name=class_name), (userid, details.SchoolId, subject))
     # Update staffallocation table with teacherid in teacherlist for each class
-    for clas in y:
+    for i in range(len(y)):
+        clas = y[i]
         clas = clas.replace(" ", "_")
         clas = clas.lower()
-        for subject in x:
+        for subject in z[i]:
+            print(clas, subject)
             update_staffallocation_query = """
             UPDATE staffallocation
             SET {clas} = JSON_SET({clas}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({clas}, '$.teacherlist'), '$', %s))
             WHERE schoolid = %s AND subject = %s
             """
             cursor.execute(update_staffallocation_query.format(clas=clas), (userid, details.SchoolId, subject))
-        
+    
     db.commit()
     
     return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}
