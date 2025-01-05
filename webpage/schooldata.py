@@ -44,6 +44,10 @@ class TeacherRequest(BaseModel):
     Class: str
     Subject: str
 
+class AllottedTeachersRequest(BaseModel):
+    SchoolId: str
+    AllottedTeachers: Dict[str, Dict[str, str]]
+
 @school_data.post("/schooldata")
 async def create_school_internal_data(details: SchoolInternalData, db=Depends(get_db1)):
     cursor = db.cursor()
@@ -162,6 +166,8 @@ async def get_subjects(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
     return {"subjects": subject_list}
 # ...existing code...
 
+# ...existing code...
+
 @school_data.post("/teachers")
 async def get_teachers(teacher_request: TeacherRequest, db=Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
@@ -186,16 +192,46 @@ async def get_teachers(teacher_request: TeacherRequest, db=Depends(get_db1)):
         teacher_list = class_data.get('teacherlist', [])
     else:
         teacher_list = []
-    x=[]
-    for i in teacher_list:
-        s=cursor.execute("SELECT Name FROM teachers WHERE UserId = %s", (i,))
-        s=cursor.fetchone()
-        print(s)
-        if s:x.append(s['Name'])
+    teachers = []
+    for teacher_id in teacher_list:
+        cursor.execute("SELECT UserId, Name FROM teachers WHERE UserId = %s", (teacher_id,))
+        teacher = cursor.fetchone()
+        if teacher:
+            teachers.append({"userId": teacher["UserId"], "name": teacher["Name"]})
     
     # Log the result
-    logger.info(f"Returning teachers: {x}")
+    logger.info(f"Returning teachers: {teachers}")
     
-    return {"teachers": x}
+    return {"teachers": teachers}
+
+@school_data.post("/allottedteachers")
+async def submit_allotted_teachers(request: AllottedTeachersRequest, db=Depends(get_db1)):
+    cursor = db.cursor()
+
+    for grade, subjects in request.AllottedTeachers.items():
+        for subject, teacher_id in subjects.items():
+            class_column = grade.replace(' ', '_').lower()
+            get_allocation_query = f"SELECT {class_column} FROM staffallocation WHERE schoolid = %s AND subject = %s"
+            cursor.execute(get_allocation_query, (request.SchoolId, subject))
+            result = cursor.fetchone()
+
+            if result and class_column in result:
+                class_data = json.loads(result[class_column])
+                class_data['allocatedteacher'] = teacher_id
+                update_allocation_query = f"UPDATE staffallocation SET {class_column} = %s WHERE schoolid = %s AND subject = %s"
+                cursor.execute(update_allocation_query, (json.dumps(class_data), request.SchoolId, subject))
+            else:
+                # If the row exists but the class column is empty, update it
+                if result:
+                    update_allocation_query = f"UPDATE staffallocation SET {class_column} = %s WHERE schoolid = %s AND subject = %s"
+                    cursor.execute(update_allocation_query, (json.dumps({"teacherlist": [], "allocatedteacher": teacher_id}), request.SchoolId, subject))
+                else:
+                    # If no matching row exists, insert a new row
+                    insert_allocation_query = f"INSERT INTO staffallocation (schoolid, subject, {class_column}) VALUES (%s, %s, %s)"
+                    cursor.execute(insert_allocation_query, (request.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": teacher_id})))
+
+    db.commit()
+
+    return {"message": "Allotted teachers updated successfully"}
 
 # ...existing code...
