@@ -97,8 +97,8 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor.execute(check_contact_query, (details.contactNumber,))
     existing_teacher = cursor.fetchone()
     
-    # if existing_teacher:
-    #     return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
+    if existing_teacher:
+        return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
     
     # Generate a password
     generated_password = generate_password()
@@ -152,12 +152,14 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor.execute(create_staffallocation_table_query)
     x=[]
     y=[]
+    z=[]
     for subject, classes in details.subjectSpecialization.items():
         y.append(subject)
+        z.append(classes)
         for i in classes:
             x.append(i)
     x=set(x)
-    # print(x,y)
+    print(x,y,z)
 
     # Insert subjects and initialize class cells with empty dict format
     for subject in x:
@@ -167,16 +169,26 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
             schoolid, subject, nursery, LKG, UKG, class_1, class_2, class_3, class_4, class_5, class_6, class_7, class_8, class_9, class_10, class_11, class_12
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_staffallocation_query, (
-            details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-        ))
+        # Check if the subject already exists for the given SchoolId
+        check_subject_query = "SELECT 1 FROM staffallocation WHERE SchoolId = %s AND subject = %s"
+        cursor.execute(check_subject_query, (details.SchoolId, subject))
+        existing_subject = cursor.fetchone()
+        
+        # Perform the insertion if the subject does not exist
+        if not existing_subject:
+            cursor.execute(insert_staffallocation_query, (
+                details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
+            ))
+        
+        # Continue with the remaining code
+        # ...existing code...
     
     # # Update staffallocation table with teacherid in teacherlist for each class
     # for subject, classes in details.subjectSpecialization.items():
@@ -188,17 +200,19 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     #         """
     #         cursor.execute(update_staffallocation_query.format(class_name=class_name), (userid, details.SchoolId, subject))
     # Update staffallocation table with teacherid in teacherlist for each class
-    for clas in y:
+    for i in range(len(y)):
+        clas = y[i]
         clas = clas.replace(" ", "_")
         clas = clas.lower()
-        for subject in x:
+        for subject in z[i]:
+            print(clas, subject)
             update_staffallocation_query = """
             UPDATE staffallocation
             SET {clas} = JSON_SET({clas}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({clas}, '$.teacherlist'), '$', %s))
             WHERE schoolid = %s AND subject = %s
             """
             cursor.execute(update_staffallocation_query.format(clas=clas), (userid, details.SchoolId, subject))
-        
+    
     db.commit()
     
     return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}
