@@ -11,7 +11,7 @@ import json
 studentregistration_router = APIRouter()
 
 class StudentRegistration(BaseModel):
-    SchoolId: Optional[int] = 1  # Default value set to 1
+    SchoolId: Optional[str] = None  # Default value set to 1
     StudentName: Optional[str] = None
     DOB: Optional[date] = None
     Gender: Optional[str] = None  # Changed to str for compatibility with varchar(10)
