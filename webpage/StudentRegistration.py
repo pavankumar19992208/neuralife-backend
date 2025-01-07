@@ -97,7 +97,7 @@ async def register_student(details: StudentRegistration, db=Depends(get_db1)):
     cursor.execute(create_table_query)
 
     # Ensure SchoolId is set to 1
-    details.SchoolId = 1
+    # details.SchoolId = 1
 
     # Generate UserId
     user_id = generate_user_id(details.MobileNumber, db)
