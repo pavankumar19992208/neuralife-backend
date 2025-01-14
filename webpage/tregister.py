@@ -216,3 +216,22 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     db.commit()
     
     return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}
+
+@teacher_router.get("/teachers")
+async def get_teachers(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT teacherid, Name FROM teachers")
+    teachers = cursor.fetchall()
+    return {"teachers": teachers}
+
+@teacher_router.get("/teachers/{teacherid}")
+async def get_teacher_details(teacherid: int, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM teachers WHERE teacherid = %s", (teacherid,))
+    teacher = cursor.fetchone()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    # Assuming subjectSpecialization is stored as JSON in the database
+    teacher['subjectSpecialization'] = json.loads(teacher['subjectSpecialization']) if teacher['subjectSpecialization'] else {}
+    return teacher

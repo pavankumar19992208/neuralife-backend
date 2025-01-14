@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 from pydantic import BaseModel
 import mysql.connector
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 import logging
 
@@ -35,6 +35,7 @@ class SchoolInternalData(BaseModel):
     TotalAmount: float
     TeachingStaff: List[str]
     NonTeachingStaff: List[str]
+    GradesOffered: List[str]
 
 class SchoolIdRequest(BaseModel):
     SchoolId: str
@@ -42,7 +43,7 @@ class SchoolIdRequest(BaseModel):
 class TeacherRequest(BaseModel):
     SchoolId: str
     Class: str
-    Subject: str
+    Subject: Optional[str] = None
 
 class AllottedTeachersRequest(BaseModel):
     SchoolId: str
@@ -77,18 +78,30 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
         FeeStructure JSON,
         TotalAmount FLOAT,
         TeachingStaff JSON,
-        NonTeachingStaff JSON
+        NonTeachingStaff JSON,
+        GradesOffered JSON
     )
     """
     cursor.execute(create_schooldata_table_query)
+
+    # Check if GradesOffered column exists
+    cursor.execute("SHOW COLUMNS FROM schooldata LIKE 'GradesOffered'")
+    result = cursor.fetchone()
+    if not result:
+        # Alter table to add GradesOffered column if it does not exist
+        alter_table_query = """
+        ALTER TABLE schooldata 
+        ADD COLUMN GradesOffered JSON
+        """
+        cursor.execute(alter_table_query)
     
     # Insert values into schooldata table
     insert_schooldata_query = """
     INSERT INTO schooldata (
         SchoolId, State, SchoolType, Curriculum, OtherCurriculum, GradeLevelFrom, GradeLevelTo, Subjects, Medium,
         AcademicYearStart, AcademicYearEnd, ExtraPrograms, SchoolTimingFrom, SchoolTimingTo, ExamPattern,
-        OtherExamPattern, AssessmentCriteria, OtherAssessmentCriteria, FeeStructure, TotalAmount, TeachingStaff, NonTeachingStaff
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        OtherExamPattern, AssessmentCriteria, OtherAssessmentCriteria, FeeStructure, TotalAmount, TeachingStaff, NonTeachingStaff, GradesOffered
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_schooldata_query, (
         details.SchoolId, details.State, details.SchoolType, details.Curriculum, details.OtherCurriculum,
@@ -96,7 +109,7 @@ async def create_school_internal_data(details: SchoolInternalData, db=Depends(ge
         details.AcademicYearStart, details.AcademicYearEnd, json.dumps(details.ExtraPrograms),
         details.SchoolTimingFrom, details.SchoolTimingTo, details.ExamPattern, details.OtherExamPattern,
         details.AssessmentCriteria, details.OtherAssessmentCriteria, json.dumps(details.FeeStructure),
-        details.TotalAmount, json.dumps(details.TeachingStaff), json.dumps(details.NonTeachingStaff)
+        details.TotalAmount, json.dumps(details.TeachingStaff), json.dumps(details.NonTeachingStaff), json.dumps(details.GradesOffered)
     ))
     
     db.commit()
@@ -121,6 +134,7 @@ async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1
         row['FeeStructure'] = json.loads(row['FeeStructure'])
         row['TeachingStaff'] = json.loads(row['TeachingStaff'])
         row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
+        row['GradesOffered'] = json.loads(row['GradesOffered'])  # Ensure GradesOffered is included
         return {"message": "School info retrieved successfully", "data": row}
     else:
         raise HTTPException(status_code=404, detail="School data not found")
@@ -204,6 +218,8 @@ async def get_teachers(teacher_request: TeacherRequest, db=Depends(get_db1)):
     
     return {"teachers": teachers}
 
+# ...existing code...
+
 @school_data.post("/allottedteachers")
 async def submit_allotted_teachers(request: AllottedTeachersRequest, db=Depends(get_db1)):
     cursor = db.cursor()
@@ -215,23 +231,50 @@ async def submit_allotted_teachers(request: AllottedTeachersRequest, db=Depends(
             cursor.execute(get_allocation_query, (request.SchoolId, subject))
             result = cursor.fetchone()
 
-            if result and class_column in result:
-                class_data = json.loads(result[class_column])
+            if result:
+                class_data = json.loads(result[0]) if result[0] else {"teacherlist": []}
                 class_data['allocatedteacher'] = teacher_id
                 update_allocation_query = f"UPDATE staffallocation SET {class_column} = %s WHERE schoolid = %s AND subject = %s"
                 cursor.execute(update_allocation_query, (json.dumps(class_data), request.SchoolId, subject))
             else:
-                # If the row exists but the class column is empty, update it
-                if result:
-                    update_allocation_query = f"UPDATE staffallocation SET {class_column} = %s WHERE schoolid = %s AND subject = %s"
-                    cursor.execute(update_allocation_query, (json.dumps({"teacherlist": [], "allocatedteacher": teacher_id}), request.SchoolId, subject))
-                else:
-                    # If no matching row exists, insert a new row
-                    insert_allocation_query = f"INSERT INTO staffallocation (schoolid, subject, {class_column}) VALUES (%s, %s, %s)"
-                    cursor.execute(insert_allocation_query, (request.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": teacher_id})))
+                # If no matching row exists, insert a new row
+                insert_allocation_query = f"INSERT INTO staffallocation (schoolid, subject, {class_column}) VALUES (%s, %s, %s)"
+                cursor.execute(insert_allocation_query, (request.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": teacher_id})))
 
     db.commit()
 
     return {"message": "Allotted teachers updated successfully"}
+
+@school_data.post("/class-subjects-teachers")
+async def get_class_subjects_teachers(teacher_request: TeacherRequest, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    
+    # Log the incoming request
+    logger.info(f"Received request for class subjects and teachers with SchoolId: {teacher_request.SchoolId}, Class: {teacher_request.Class}")
+    class_column = teacher_request.Class.replace(' ', '_').lower()
+    
+    # Query to get the subjects and their allotted teachers for a specific SchoolId and Class
+    get_subjects_teachers_query = f"""
+    SELECT subject, {class_column}
+    FROM staffallocation 
+    WHERE schoolid = %s
+    """
+    cursor.execute(get_subjects_teachers_query, (teacher_request.SchoolId,))
+    subjects_teachers = cursor.fetchall()
+    
+    result = []
+    for item in subjects_teachers:
+        class_data = json.loads(item[class_column])
+        allocated_teacher_id = class_data.get('allocatedteacher')
+        if allocated_teacher_id:
+            cursor.execute("SELECT Name FROM teachers WHERE UserId = %s", (allocated_teacher_id,))
+            teacher = cursor.fetchone()
+            if teacher:
+                result.append({"subject": item['subject'], "teacher": teacher["Name"]})
+    
+    # Log the result
+    logger.info(f"Returning subjects and teachers: {result}")
+    
+    return {"subjects_teachers": result}
 
 # ...existing code...
