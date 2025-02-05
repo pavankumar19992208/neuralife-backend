@@ -3,6 +3,7 @@ from db import get_db1
 import mysql.connector
 from pydantic import BaseModel
 from typing import Dict, List, Optional
+from datetime import datetime, time
 
 ct_router = APIRouter()
 
@@ -67,6 +68,31 @@ async def create_class_timetable(timetable: ClassTimeTable, db=Depends(get_db1))
     db.commit()
     
     return {"message": "Timetable updated successfully"}
+
+@ct_router.get("/classtimetable/{school_id}/{class_name}")
+async def get_class_timetable(school_id: str, class_name: str, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    select_timetable_query = """
+    SELECT day, period, from_time, to_time, subject, teacher
+    FROM classtime
+    WHERE SchoolId = %s AND class_name = %s
+    """
+    cursor.execute(select_timetable_query, (school_id, class_name))
+    rows = cursor.fetchall()
+    
+    timetable = {}
+    for row in rows:
+        day = row['day']
+        period = row['period']
+        if day not in timetable:
+            timetable[day] = {'periods': {}}
+        timetable[day]['periods'][period] = {
+            'from_time': (datetime.min + row['from_time']).time().strftime('%H:%M'),
+            'to_time': (datetime.min + row['to_time']).time().strftime('%H:%M'),
+            'subject': row['subject'],
+            'teacher': row['teacher']
+        }
+    return timetable
 
 # Add the router to your main application
 from fastapi import FastAPI

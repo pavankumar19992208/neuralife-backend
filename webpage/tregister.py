@@ -220,7 +220,7 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
 @teacher_router.get("/teachers")
 async def get_teachers(db=Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT teacherid, Name FROM teachers")
+    cursor.execute("SELECT teacherid, Name, qualification, experience FROM teachers")
     teachers = cursor.fetchall()
     return {"teachers": teachers}
 
