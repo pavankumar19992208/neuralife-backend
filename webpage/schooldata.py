@@ -278,3 +278,30 @@ async def get_class_subjects_teachers(teacher_request: TeacherRequest, db=Depend
     return {"subjects_teachers": result}
 
 # ...existing code...
+
+# ...existing code...
+
+@school_data.post("/schoolinfo")
+async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    
+    # Query to get the row that matches the given SchoolId
+    get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
+    cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
+    
+    # Fetch the row
+    row = cursor.fetchone()
+    
+    if row:
+        # Convert JSON fields back to Python objects
+        row['Subjects'] = json.loads(row['Subjects'])
+        row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
+        row['FeeStructure'] = json.loads(row['FeeStructure'])
+        row['TeachingStaff'] = json.loads(row['TeachingStaff'])
+        row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
+        row['GradesOffered'] = json.loads(row['GradesOffered'])
+        return {"message": "School info retrieved successfully", "data": row}
+    else:
+        raise HTTPException(status_code=404, detail="School data not found")
+
+# ...existing code...
