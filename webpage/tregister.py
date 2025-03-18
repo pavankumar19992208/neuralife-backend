@@ -7,6 +7,10 @@ from typing import List, Dict, Optional
 import json
 import secrets
 import string
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 teacher_router = APIRouter()
 
@@ -48,6 +52,11 @@ class TeacherRegistration(BaseModel):
     interests: Optional[str] = None
     availabilityOfExtraCirricularActivities: Optional[str] = None
     documents: Optional[Documents] = None
+
+class Documents(BaseModel):
+    resume: Optional[str] = None
+    photoID: Optional[str] = None
+    educationalCertificates: Optional[str] = None
 
 def generate_password(length=8):
     characters = string.ascii_letters + string.digits
@@ -187,19 +196,6 @@ async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
                 json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
             ))
         
-        # Continue with the remaining code
-        # ...existing code...
-    
-    # # Update staffallocation table with teacherid in teacherlist for each class
-    # for subject, classes in details.subjectSpecialization.items():
-    #     for class_name in classes:
-    #         update_staffallocation_query = """
-    #         UPDATE staffallocation
-    #         SET {class_name} = JSON_SET({class_name}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({class_name}, '$.teacherlist'), '$', %s))
-    #         WHERE schoolid = %s AND subject = %s
-    #         """
-    #         cursor.execute(update_staffallocation_query.format(class_name=class_name), (userid, details.SchoolId, subject))
-    # Update staffallocation table with teacherid in teacherlist for each class
     for i in range(len(y)):
         clas = y[i]
         clas = clas.replace(" ", "_")
@@ -235,3 +231,30 @@ async def get_teacher_details(teacherid: int, db=Depends(get_db1)):
     # Assuming subjectSpecialization is stored as JSON in the database
     teacher['subjectSpecialization'] = json.loads(teacher['subjectSpecialization']) if teacher['subjectSpecialization'] else {}
     return teacher
+
+@teacher_router.put("/teachers/{teacherid}/documents")
+async def update_teacher_documents(teacherid: int, documents: Documents, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT documents, Name FROM teachers WHERE teacherid = %s", (teacherid,))
+    teacher = cursor.fetchone()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    existing_documents = json.loads(teacher['documents']) if teacher['documents'] else {}
+        
+    # Log the new documents provided
+    new_documents = documents.dict(exclude_unset=True)
+    logging.info(f"New documents provided: {new_documents}")
+    
+    # Update the existing documents with the new documents
+    updated_documents = {**existing_documents, **new_documents}
+    
+    # Log the updated documents
+    logging.info(f"Updated documents for teacher {teacher['Name']} (ID: {teacherid}): {updated_documents}")
+    
+    update_documents_query = "UPDATE teachers SET documents = %s WHERE teacherid = %s"
+    cursor.execute(update_documents_query, (json.dumps(updated_documents), teacherid))
+    db.commit()
+    
+    return {"message": "Documents updated successfully"}
+

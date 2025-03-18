@@ -20,6 +20,7 @@ from webpage.classtimetable import ct_router
 from webpage.StudentRegistration import studentregistration_router
 from app.slinkedin.fetchdata import SLinkedInUserrouter
 from app.updatedata import update_router
+from webpage.leave_approval import leave_approval_router
 app = FastAPI(docs_url="/docs")
 
 origins = [
@@ -59,3 +60,4 @@ app.include_router(friend_request_router)
 app.include_router(chat_router)
 app.include_router(chatdata_router)
 app.include_router(update_router)
+app.include_router(leave_approval_router)
