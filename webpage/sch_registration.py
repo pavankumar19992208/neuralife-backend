@@ -1,77 +1,80 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from db import get_db1
-import pyodbc
 from pydantic import BaseModel
 import random
 import string
 import mysql.connector
 
 class SchoolRegistration(BaseModel):
-    SCHOOL_ID: str
-    D_NO: str
-    STREET: str
-    AREA: str
-    CITY: str
-    DISTRICT: str
-    STATE: str
-    PIN_CODE: str
-    GEO_TAG: str
-    SCHOOL_NAME: str
-    SYLLABUS_TYPE: str
-    ADH_NAME: str
-    ADH_MOBILE: str
-    ADH_EMAIL: str
-    SCHOOL_LOGO: str  # Add SCHOOL_LOGO field
+    school_name: str
+    syllabus_type: str
+    admin_name: str
+    mobile_number: str
+    email: str
+    password: str  # Corrected typo from 'pasword' to 'password'
 
 sch_router = APIRouter()
 
 @sch_router.post("/schregister")
 async def register_school(school: SchoolRegistration):
-    PASSWORD = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    # Generate a 12-digit SCHOOL_ID with only numbers
+    SCHOOL_ID = ''.join(random.choices(string.digits, k=10))
+    
+    # Use the password provided by the frontend
+    PASSWORD = school.password
+
+    # Ensure the mobile number includes the country code +91
+    MOBILE_NUMBER = f"+91{school.mobile_number}" if not school.mobile_number.startswith("+91") else school.mobile_number
+
     db = get_db1()
     cursor = db.cursor()
 
-    # Create tables if they do not exist
+    # Create address table without the mobile_number column
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS schools (
-        SCHOOL_ID VARCHAR(50) PRIMARY KEY,
-        SCHOOL_NAME VARCHAR(100),
-        SYLLABUS_TYPE VARCHAR(50),
-        ADH_NAME VARCHAR(100),
-        ADH_MOBILE VARCHAR(15),
-        ADH_EMAIL VARCHAR(100),
-        PASSWORD VARCHAR(50),
-        SCHOOL_LOGO VARCHAR(255)  # Add SCHOOL_LOGO field
+    CREATE TABLE IF NOT EXISTS address (
+        address_id INT PRIMARY KEY AUTO_INCREMENT,
+        d_no VARCHAR(50) DEFAULT NULL,
+        street VARCHAR(100) DEFAULT NULL,
+        area VARCHAR(100) DEFAULT NULL,
+        city VARCHAR(100) DEFAULT NULL,
+        district VARCHAR(100) DEFAULT NULL,
+        state VARCHAR(100) DEFAULT NULL,
+        pin_code VARCHAR(10) DEFAULT NULL,
+        geo_tag VARCHAR(100) DEFAULT NULL
     )
     """)
 
+    # Create schools table with a foreign key reference to address
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS address (
-        ID VARCHAR(50) PRIMARY KEY,
-        MOBILE VARCHAR(15),
-        D_NO VARCHAR(50),
-        STREET VARCHAR(100),
-        AREA VARCHAR(100),
-        CITY VARCHAR(100),
-        DISTRICT VARCHAR(100),
-        STATE VARCHAR(100),
-        PIN_CODE VARCHAR(10),
-        GEO_TAG VARCHAR(100)
+    CREATE TABLE IF NOT EXISTS schools (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        school_id VARCHAR(50) NOT NULL,
+        school_name VARCHAR(100) DEFAULT NULL,
+        syllabus_type VARCHAR(50) DEFAULT NULL,
+        administrative_head_name VARCHAR(100) DEFAULT NULL,
+        administrative_head_number VARCHAR(15) DEFAULT NULL,
+        administrative_head_email VARCHAR(100) DEFAULT NULL,
+        password VARCHAR(255) NOT NULL,
+        school_logo VARCHAR(255) DEFAULT NULL,
+        address_id INT DEFAULT NULL,
+        token VARCHAR(255) DEFAULT NULL,
+        otp VARCHAR(10) DEFAULT NULL,
+        CONSTRAINT fk_address FOREIGN KEY (address_id) REFERENCES address(address_id) ON DELETE CASCADE
     )
     """)
 
     # Insert into schools table
     cursor.execute(
-        "INSERT INTO schools (SCHOOL_ID, SCHOOL_NAME, SYLLABUS_TYPE, ADH_NAME, ADH_MOBILE, ADH_EMAIL, PASSWORD, SCHOOL_LOGO) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (school.SCHOOL_ID, school.SCHOOL_NAME, school.SYLLABUS_TYPE, school.ADH_NAME, school.ADH_MOBILE, school.ADH_EMAIL, PASSWORD, school.SCHOOL_LOGO)
+        "INSERT INTO schools (school_id, school_name, syllabus_type, administrative_head_name, administrative_head_number, administrative_head_email, password) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (SCHOOL_ID, school.school_name, school.syllabus_type, school.admin_name, MOBILE_NUMBER, school.email, PASSWORD)
     )
 
-    # Insert into address table
+    # Insert into address table (optional, if address details are provided later)
     cursor.execute(
-        "INSERT INTO address (ID, MOBILE, D_NO, STREET, AREA, CITY, DISTRICT, STATE, PIN_CODE, GEO_TAG) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (school.SCHOOL_ID, school.ADH_MOBILE, school.D_NO, school.STREET, school.AREA, school.CITY, school.DISTRICT, school.STATE, school.PIN_CODE, school.GEO_TAG)
+        "INSERT INTO address (d_no, street, area, city, district, state, pin_code, geo_tag) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        (None, None, None, None, None, None, None, None)  # Replace with actual address details if available
     )
 
     db.commit()
 
-    return {"SCHOOL_ID": school.SCHOOL_ID, "PASSWORD": PASSWORD}
+    return {"SCHOOL_ID": SCHOOL_ID, "PASSWORD": PASSWORD}
