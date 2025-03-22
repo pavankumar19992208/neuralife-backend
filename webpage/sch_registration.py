@@ -11,25 +11,24 @@ class SchoolRegistration(BaseModel):
     admin_name: str
     mobile_number: str
     email: str
-    password: str  # Corrected typo from 'pasword' to 'password'
+    password: str
+
+class LoginRequest(BaseModel):
+    schoolId: str = None
+    mobile_number: str = None
+    password: str
 
 sch_router = APIRouter()
 
 @sch_router.post("/schregister")
 async def register_school(school: SchoolRegistration):
-    # Generate a 12-digit SCHOOL_ID with only numbers
     SCHOOL_ID = ''.join(random.choices(string.digits, k=10))
-    
-    # Use the password provided by the frontend
     PASSWORD = school.password
-
-    # Ensure the mobile number includes the country code +91
     MOBILE_NUMBER = f"+91{school.mobile_number}" if not school.mobile_number.startswith("+91") else school.mobile_number
 
     db = get_db1()
     cursor = db.cursor()
 
-    # Create address table without the mobile_number column
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS address (
         address_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -44,7 +43,6 @@ async def register_school(school: SchoolRegistration):
     )
     """)
 
-    # Create schools table with a foreign key reference to address
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS schools (
         id INT PRIMARY KEY AUTO_INCREMENT,
@@ -63,18 +61,43 @@ async def register_school(school: SchoolRegistration):
     )
     """)
 
-    # Insert into schools table
     cursor.execute(
         "INSERT INTO schools (school_id, school_name, syllabus_type, administrative_head_name, administrative_head_number, administrative_head_email, password) VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (SCHOOL_ID, school.school_name, school.syllabus_type, school.admin_name, MOBILE_NUMBER, school.email, PASSWORD)
     )
 
-    # Insert into address table (optional, if address details are provided later)
     cursor.execute(
         "INSERT INTO address (d_no, street, area, city, district, state, pin_code, geo_tag) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (None, None, None, None, None, None, None, None)  # Replace with actual address details if available
+        (None, None, None, None, None, None, None, None)
     )
 
     db.commit()
 
     return {"SCHOOL_ID": SCHOOL_ID, "PASSWORD": PASSWORD}
+
+@sch_router.post("/login")
+async def login(login_request: LoginRequest):
+    db = get_db1()
+    cursor = db.cursor(dictionary=True)
+
+    if login_request.schoolId:
+        cursor.execute(
+            "SELECT * FROM schools WHERE school_id = %s AND password = %s",
+            (login_request.schoolId, login_request.password)
+        )
+    elif login_request.mobile_number:
+        # Ensure the mobile number includes the country code +91
+        MOBILE_NUMBER = f"+91{login_request.mobile_number}" if not login_request.mobile_number.startswith("+91") else login_request.mobile_number
+        cursor.execute(
+            "SELECT * FROM schools WHERE administrative_head_number = %s AND password = %s",
+            (MOBILE_NUMBER, login_request.password)
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Either schoolId or mobile_number must be provided")
+
+    school = cursor.fetchone()
+
+    if not school:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return {"message": "Login successful", "school": school}
