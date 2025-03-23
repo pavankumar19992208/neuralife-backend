@@ -4,6 +4,14 @@ from pydantic import BaseModel
 import random
 import string
 import mysql.connector
+import boto3
+import os
+from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+load_dotenv()
 
 class SchoolRegistration(BaseModel):
     school_name: str
@@ -17,6 +25,9 @@ class LoginRequest(BaseModel):
     schoolId: str = None
     mobile_number: str = None
     password: str
+
+class SendOTPRequest(BaseModel):
+    mobile_number: str
 
 sch_router = APIRouter()
 
@@ -86,7 +97,6 @@ async def login(login_request: LoginRequest):
             (login_request.schoolId, login_request.password)
         )
     elif login_request.mobile_number:
-        # Ensure the mobile number includes the country code +91
         MOBILE_NUMBER = f"+91{login_request.mobile_number}" if not login_request.mobile_number.startswith("+91") else login_request.mobile_number
         cursor.execute(
             "SELECT * FROM schools WHERE administrative_head_number = %s AND password = %s",
@@ -101,3 +111,40 @@ async def login(login_request: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     return {"message": "Login successful", "school": school}
+
+@sch_router.post("/send-otp")
+async def send_otp(otp_request: SendOTPRequest):
+    try:
+        # Generate a random 6-digit OTP
+        otp = ''.join(random.choices(string.digits, k=4))
+        logging.debug(f"Generated OTP: {otp}")
+
+        # Send OTP via AWS SNS
+        client = boto3.client(
+            'sns',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name="eu-north-1"
+        )
+        logging.debug("AWS SNS client initialized")
+
+        response = client.publish(
+            PhoneNumber=otp_request.mobile_number,
+            Message=f'Your OTP is {otp}'
+        )
+        logging.debug(f"AWS SNS response: {response}")
+
+        # Save OTP to the database (optional)
+        db = get_db1()
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE schools SET otp = %s WHERE administrative_head_number = %s",
+            (otp, otp_request.mobile_number)
+        )
+        db.commit()
+        logging.debug("OTP saved to database")
+
+        return {"message": "OTP sent successfully"}
+    except Exception as e:
+        logging.error(f"Error sending OTP: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
