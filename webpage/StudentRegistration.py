@@ -10,6 +10,7 @@ import json
 import logging
 import boto3
 import os
+from typing import Literal 
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,8 +24,26 @@ sns_client = boto3.client(
     "sns",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name="eu-north-1"
+    region_name="ap-south-1"
 )
+
+class Occupation(BaseModel):
+    occupation_id: int
+    occupation_name: str
+    category: str
+    income_level: Optional[str] = None  # Make income_level optional
+
+class Qualification(BaseModel):
+    qualification_id: int
+    qualification_name: str
+    level: str
+    typical_duration: Optional[str] = None
+    is_technical: Optional[bool] = None
+    indian_equivalent: Optional[str] = None
+
+class StudentLanguage(BaseModel):
+    language_id: int
+    language_type: str  # 'mother_tongue' or 'secondary_language'
 
 class StudentRegistration(BaseModel):
     SchoolId: Optional[str] = None
@@ -34,9 +53,9 @@ class StudentRegistration(BaseModel):
     Photo: Optional[str] = None
     Grade: Optional[int] = None
     PreviousSchool: Optional[str] = None
-    LanguagesKnown: Optional[List[str]] = None
+    LanguagesKnown: Optional[List[StudentLanguage]] = None
     Religion: Optional[str] = None
-    Category: Optional[str] = None
+    Category: Optional[Literal['SC', 'ST', 'OBC', 'GEN', 'EWS', 'PWD']] = None
     MotherName: Optional[str] = None
     FatherName: Optional[str] = None
     Nationality: Optional[str] = None
@@ -54,8 +73,18 @@ class StudentRegistration(BaseModel):
     ParentOccupation: Optional[str] = None
     ParentQualification: Optional[str] = None
 
+
 class DocumentUploadPayload(BaseModel):
     Documents: Dict[str, str]
+
+class Disability(BaseModel):
+    disability_id: int
+    disability_code: str
+    disability_name: str
+    category: str
+    description: Optional[str] = None
+    requires_assistance: Optional[bool] = None
+    is_rare: Optional[bool] = None
 
 def generate_user_id(mobile_number: str, db):
     cursor = db.cursor()
@@ -145,20 +174,31 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
         # Insert student details into the database
         insert_query = """
         INSERT INTO student (
-            SchoolId, Name, DOB, Gender, Photo, Grade, PreviousSchool, LanguagesKnown, Religion, Category,
-            MotherName, FatherName, Nationality, AadharNumber, GuardianName, MobileNumber, Email, EmergencyContact,
-            CurrentAddress, PermanentAddress, PreviousPercentage, BloodGroup, MedicalDisability,
-            Documents, Password, UserId, ParentOccupation, ParentQualification
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            SchoolId, Name, DOB, Gender, Photo, Grade, PreviousSchool,
+            Religion, Category, MotherName, FatherName, Nationality, AadharNumber, 
+            GuardianName, MobileNumber, Email, EmergencyContact,
+            CurrentAddress, PermanentAddress, PreviousPercentage, BloodGroup, 
+            MedicalDisability, Documents, Password, UserId, ParentOccupation, ParentQualification
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
+
         cursor.execute(insert_query, (
-            detail.SchoolId, detail.StudentName, detail.DOB, detail.Gender, detail.Photo, detail.Grade, detail.PreviousSchool,
-            json.dumps(detail.LanguagesKnown), detail.Religion, detail.Category, detail.MotherName, detail.FatherName,
-            detail.Nationality, detail.AadharNumber, detail.GuardianName, mobile_number_with_country_code, detail.Email, detail.EmergencyContact,
-            json.dumps(detail.CurrentAddress), json.dumps(detail.PermanentAddress), detail.PreviousPercentage,
-            detail.BloodGroup, detail.MedicalDisability, json.dumps(detail.Documents),
-            password, user_id, detail.ParentOccupation, detail.ParentQualification
+            detail.SchoolId, detail.StudentName, detail.DOB, detail.Gender, detail.Photo, 
+            detail.Grade, detail.PreviousSchool,
+            detail.Religion, detail.Category, detail.MotherName, detail.FatherName,
+            detail.Nationality, detail.AadharNumber, detail.GuardianName, 
+            mobile_number_with_country_code, detail.Email, detail.EmergencyContact,
+            json.dumps(detail.CurrentAddress), json.dumps(detail.PermanentAddress), 
+            detail.PreviousPercentage, detail.BloodGroup, detail.MedicalDisability, 
+            json.dumps(detail.Documents), password, user_id, 
+            detail.ParentOccupation, detail.ParentQualification
         ))
+        
+        student_id = cursor.lastrowid
+        
+        # Add languages if provided
+        if detail.LanguagesKnown:
+            await add_student_languages(student_id, detail.LanguagesKnown, db)
 
         # Send SMS with user ID and password
         send_sms(mobile_number_with_country_code, user_id, password, detail.StudentName)
@@ -216,3 +256,100 @@ async def upload_documents(student_id: int, payload: DocumentUploadPayload, db=D
     db.commit()
 
     return {"message": "Documents uploaded successfully"}
+
+@studentregistration_router.get("/languages")
+async def get_languages(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT language_id, language_name FROM languages")
+    languages = cursor.fetchall()
+    return {"languages": languages}
+
+# Add new endpoint for student languages
+@studentregistration_router.post("/students/{student_id}/languages")
+async def add_student_languages(
+    student_id: int,
+    languages: List[StudentLanguage],
+    db=Depends(get_db1)
+):
+    cursor = db.cursor()
+    for lang in languages:
+        cursor.execute(
+            "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
+            (student_id, lang.language_id, lang.language_type)
+        )
+    db.commit()
+    return {"message": "Languages added successfully"}
+
+# Add endpoint to get student languages
+@studentregistration_router.get("/students/{student_id}/languages")
+async def get_student_languages(student_id: int, db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT l.language_id, l.language_name, sl.language_type 
+        FROM languages l
+        JOIN student_languages sl ON l.language_id = sl.language_id
+        WHERE sl.student_id = %s
+    """, (student_id,))
+    return {"languages": cursor.fetchall()}
+
+@studentregistration_router.get("/nationalities")
+async def get_nationalities(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT nationality_id, nationality_name FROM nationalities ORDER BY nationality_name")
+    nationalities = cursor.fetchall()
+    return {"nationalities": nationalities}
+
+@studentregistration_router.get("/religions")
+async def get_religions(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT religion_id, religion_name FROM religions ORDER BY religion_name")
+    religions = cursor.fetchall()
+    return {"religions": religions}
+
+@studentregistration_router.get("/occupations", response_model=List[Occupation])
+async def get_occupations(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT 
+            occupation_id, 
+            occupation_name, 
+            category, 
+            COALESCE(income_level, '') as income_level  # Convert NULL to empty string
+        FROM occupations
+    """)
+    occupations = cursor.fetchall()
+    return occupations
+
+@studentregistration_router.get("/qualifications", response_model=List[Qualification])
+async def get_qualifications(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT 
+            qualification_id, 
+            qualification_name, 
+            level, 
+            typical_duration,
+            is_technical,
+            indian_equivalent
+        FROM qualifications
+        ORDER BY qualification_name
+    """)
+    qualifications = cursor.fetchall()
+    return qualifications
+
+@studentregistration_router.get("/disabilities", response_model=List[Disability])
+async def get_disabilities(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT 
+            disability_id, 
+            disability_code, 
+            disability_name, 
+            category,
+            description,
+            requires_assistance,
+            is_rare
+        FROM disabilities
+        ORDER BY disability_name
+    """)
+    return cursor.fetchall()

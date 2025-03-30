@@ -29,6 +29,16 @@ class LoginRequest(BaseModel):
 class SendOTPRequest(BaseModel):
     mobile_number: str
 
+# Update your SendOTPRequest model
+class SendOTPRequest(BaseModel):
+    mobile_number: str = None
+    schoolId: str = None
+
+class VerifyOTPRequest(BaseModel):
+    mobile_number: str = None
+    schoolId: str = None
+    otp: str
+
 sch_router = APIRouter()
 
 @sch_router.post("/schregister")
@@ -89,7 +99,12 @@ async def register_school(school: SchoolRegistration):
 @sch_router.post("/login")
 async def login(login_request: LoginRequest):
     db = get_db1()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
     cursor = db.cursor(dictionary=True)
+
+    logging.debug(f"Login request: schoolId={login_request.schoolId}, mobile_number={login_request.mobile_number}, password={login_request.password}")
 
     if login_request.schoolId:
         cursor.execute(
@@ -108,43 +123,111 @@ async def login(login_request: LoginRequest):
     school = cursor.fetchone()
 
     if not school:
+        logging.debug("Invalid credentials: No matching record found")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    logging.debug(f"Login successful for school: {school}")
     return {"message": "Login successful", "school": school}
 
+# Update the send-otp endpoint
 @sch_router.post("/send-otp")
 async def send_otp(otp_request: SendOTPRequest):
     try:
-        # Generate a random 6-digit OTP
+        db = get_db1()
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+        
+        cursor = db.cursor(dictionary=True)
+        
+        # Find the mobile number either directly or via school ID
+        if otp_request.mobile_number:
+            mobile_number = f"+91{otp_request.mobile_number}" if not otp_request.mobile_number.startswith("+91") else otp_request.mobile_number
+            cursor.execute(
+                "SELECT school_id, administrative_head_number FROM schools WHERE administrative_head_number = %s",
+                (mobile_number,)
+            )
+        elif otp_request.schoolId:
+            cursor.execute(
+                "SELECT school_id, administrative_head_number FROM schools WHERE school_id = %s",
+                (otp_request.schoolId,)
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Either mobile_number or schoolId must be provided")
+        
+        school = cursor.fetchone()
+        if not school:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        mobile_number = school['administrative_head_number']
+        school_id = school['school_id']
+        
+        # Generate a random 4-digit OTP
         otp = ''.join(random.choices(string.digits, k=4))
-        logging.debug(f"Generated OTP: {otp}")
+        logging.debug(f"Generated OTP: {otp} for mobile_number: {mobile_number}, school_id: {school_id}")
 
         # Send OTP via AWS SNS
         client = boto3.client(
             'sns',
             aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
             aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-            region_name="eu-north-1"
+            region_name=os.getenv('AWS_REGION')
         )
-        logging.debug("AWS SNS client initialized")
-
+        
         response = client.publish(
-            PhoneNumber=otp_request.mobile_number,
+            PhoneNumber=mobile_number,
             Message=f'Your OTP is {otp}'
         )
         logging.debug(f"AWS SNS response: {response}")
 
-        # Save OTP to the database (optional)
-        db = get_db1()
-        cursor = db.cursor()
+        # Store the OTP in the database for the respective school ID
         cursor.execute(
-            "UPDATE schools SET otp = %s WHERE administrative_head_number = %s",
-            (otp, otp_request.mobile_number)
+            "UPDATE schools SET otp = %s WHERE school_id = %s",
+            (otp, school_id)
         )
         db.commit()
-        logging.debug("OTP saved to database")
+        logging.debug(f"OTP stored in database for school_id: {school_id}, mobile_number: {mobile_number}, OTP: {otp}")
+        logging.debug(f"Attempting to send to: {mobile_number}")
+        logging.debug(f"Full AWS credentials: {os.getenv('AWS_ACCESS_KEY_ID')[:5]}...{os.getenv('AWS_SECRET_ACCESS_KEY')[:5]}...")
+        logging.debug(f"AWS Region: {os.getenv('AWS_REGION')}")
 
-        return {"message": "OTP sent successfully"}
+        return {"message": "OTP sent successfully", "mobile_number": mobile_number}
     except Exception as e:
         logging.error(f"Error sending OTP: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@sch_router.post("/verify-otp-login")
+async def verify_otp_login(verify_request: VerifyOTPRequest):
+    db = get_db1()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    cursor = db.cursor(dictionary=True)
+
+    # Find the school by either mobile number or school ID
+    if verify_request.mobile_number:
+        mobile_number = f"+91{verify_request.mobile_number}" if not verify_request.mobile_number.startswith("+91") else verify_request.mobile_number
+        cursor.execute(
+            "SELECT * FROM schools WHERE administrative_head_number = %s",
+            (mobile_number,))
+    elif verify_request.schoolId:
+        cursor.execute(
+            "SELECT * FROM schools WHERE school_id = %s",
+            (verify_request.schoolId,))
+    else:
+        raise HTTPException(status_code=400, detail="Either mobile_number or schoolId must be provided")
+
+    school = cursor.fetchone()
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+
+    # Verify OTP
+    if school['otp'] != verify_request.otp:
+        raise HTTPException(status_code=401, detail="Invalid OTP")
+
+    # Clear the OTP after successful verification
+    cursor.execute(
+        "UPDATE schools SET otp = NULL WHERE school_id = %s",
+        (school['school_id'],))
+    db.commit()
+
+    return {"message": "Login successful", "school": school}
