@@ -46,32 +46,27 @@ class StudentLanguage(BaseModel):
     language_type: str  # 'mother_tongue' or 'secondary_language'
 
 class StudentRegistration(BaseModel):
-    SchoolId: Optional[str] = None
-    StudentName: Optional[str] = None
-    DOB: Optional[date] = None
-    Gender: Optional[str] = None  # Changed to str for compatibility with varchar(10)
-    Photo: Optional[str] = None
-    Grade: Optional[int] = None
-    PreviousSchool: Optional[str] = None
-    LanguagesKnown: Optional[List[StudentLanguage]] = None
-    Religion: Optional[str] = None
-    Category: Optional[Literal['SC', 'ST', 'OBC', 'GEN', 'EWS', 'PWD']] = None
-    MotherName: Optional[str] = None
-    FatherName: Optional[str] = None
-    Nationality: Optional[str] = None
-    AadharNumber: Optional[str] = None
-    GuardianName: Optional[str] = None
-    MobileNumber: Optional[str] = None
-    Email: Optional[EmailStr] = None
-    EmergencyContact: Optional[str] = None
-    CurrentAddress: Optional[Dict[str, str]] = None
-    PermanentAddress: Optional[Dict[str, str]] = None
-    PreviousPercentage: Optional[float] = None
-    BloodGroup: Optional[str] = None
-    MedicalDisability: Optional[str] = None
-    Documents: Optional[Dict[str, str]] = None
-    ParentOccupation: Optional[str] = None
-    ParentQualification: Optional[str] = None
+    school_id: Optional[str] = None
+    name: Optional[str] = None
+    dob: Optional[date] = None
+    aadhar_number: Optional[str] = None
+    contact_number: Optional[str] = None
+    grade: Optional[int] = None
+    gender: Optional[str] = None 
+    student_email: Optional[str] = None
+    previous_school: Optional[str] = None
+    mother_name: Optional[str] = None
+    father_name: Optional[str] = None
+    guardian_name: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    previous_percentage: Optional[float] = None
+    religion_id: Optional[int] = None
+    category_id: Optional[int] = None 
+    nationality_id: Optional[int] = None
+    medical_disability_id: Optional[int] = None
+    parent_qualification_id: Optional[int] = None  
+    parent_occupation_id: Optional[int] = None
+    languages: Optional[List[StudentLanguage]] = None
 
 
 class DocumentUploadPayload(BaseModel):
@@ -86,11 +81,14 @@ class Disability(BaseModel):
     requires_assistance: Optional[bool] = None
     is_rare: Optional[bool] = None
 
-def generate_user_id(mobile_number: str, db):
+def generate_user_id(contact_number: str, db):
+    if contact_number.startswith("+91"):
+        contact_number = contact_number[3:]
+
     cursor = db.cursor()
-    cursor.execute("SELECT COUNT(*) FROM student WHERE MobileNumber = %s", (mobile_number,))
+    cursor.execute("SELECT COUNT(*) FROM student WHERE contact_number = %s", (contact_number,))
     count = cursor.fetchone()[0]
-    return f"S{mobile_number[-10:]}" if count == 0 else f"S{mobile_number[-10:]}{count}"
+    return f"S{contact_number[-10:]}" if count == 0 else f"S{contact_number[-10:]}{count}"
 
 def generate_password(length=8):
     characters = string.ascii_letters + string.digits
@@ -112,100 +110,102 @@ def send_sms(mobile_number: str, user_id: str, password: str, student_name: str)
 
 @studentregistration_router.post("/registerstudent")
 async def register_student(details: Union[StudentRegistration, List[StudentRegistration]], db=Depends(get_db1)):
-    cursor = db.cursor()
+    cursor = db.cursor(dictionary=True)  # Use dictionary cursor for better handling
 
-    # Create table if not exists
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS student (
-        StudentId INT AUTO_INCREMENT PRIMARY KEY,
-        SchoolId VARCHAR(50),
-        Name VARCHAR(255),
-        DOB DATE,
-        Gender VARCHAR(10),
-        Photo VARCHAR(255),
-        Grade INT,
-        PreviousSchool VARCHAR(255),
-        LanguagesKnown JSON,
-        Religion VARCHAR(50),
-        Category VARCHAR(50),
-        MotherName VARCHAR(255),
-        FatherName VARCHAR(255),
-        Nationality VARCHAR(50),
-        AadharNumber VARCHAR(20) UNIQUE,
-        GuardianName VARCHAR(255),
-        MobileNumber VARCHAR(15),
-        Email VARCHAR(255),
-        EmergencyContact VARCHAR(15),
-        CurrentAddress JSON,
-        PermanentAddress JSON,
-        PreviousPercentage FLOAT,
-        BloodGroup VARCHAR(10),
-        MedicalDisability VARCHAR(255),
-        Documents JSON,
-        Password VARCHAR(255),
-        UserId VARCHAR(255),
-        ParentOccupation VARCHAR(255),
-        ParentQualification VARCHAR(255)
-    )
-    """
-    cursor.execute(create_table_query)
+    try:
+        # Start transaction
+        db.start_transaction()
 
-    if isinstance(details, StudentRegistration):
-        details = [details]
+        # Convert single registration to list for uniform processing
+        if isinstance(details, StudentRegistration):
+            details = [details]
 
-    for detail in details:
-        # Check if Aadhar number already exists
-        cursor.execute("SELECT Name FROM student WHERE AadharNumber = %s", (detail.AadharNumber,))
-        existing_student = cursor.fetchone()
-        if existing_student:
-            student_name = existing_student[0]
-            logging.info(f"Aadhar number {detail.AadharNumber} already exists with {student_name}")
-            raise HTTPException(status_code=409, detail=f"Aadhar number {detail.AadharNumber} already exists with {student_name}")
-
-        # Prepend +91 to MobileNumber
-        mobile_number_with_country_code = f"+91{detail.MobileNumber}"
-
-        # Generate UserId
-        user_id = generate_user_id(mobile_number_with_country_code, db)
-
-        # Generate Password
-        password = generate_password()
-
-        # Insert student details into the database
-        insert_query = """
-        INSERT INTO student (
-            SchoolId, Name, DOB, Gender, Photo, Grade, PreviousSchool,
-            Religion, Category, MotherName, FatherName, Nationality, AadharNumber, 
-            GuardianName, MobileNumber, Email, EmergencyContact,
-            CurrentAddress, PermanentAddress, PreviousPercentage, BloodGroup, 
-            MedicalDisability, Documents, Password, UserId, ParentOccupation, ParentQualification
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-
-        cursor.execute(insert_query, (
-            detail.SchoolId, detail.StudentName, detail.DOB, detail.Gender, detail.Photo, 
-            detail.Grade, detail.PreviousSchool,
-            detail.Religion, detail.Category, detail.MotherName, detail.FatherName,
-            detail.Nationality, detail.AadharNumber, detail.GuardianName, 
-            mobile_number_with_country_code, detail.Email, detail.EmergencyContact,
-            json.dumps(detail.CurrentAddress), json.dumps(detail.PermanentAddress), 
-            detail.PreviousPercentage, detail.BloodGroup, detail.MedicalDisability, 
-            json.dumps(detail.Documents), password, user_id, 
-            detail.ParentOccupation, detail.ParentQualification
-        ))
+        results = []
         
-        student_id = cursor.lastrowid
+        for detail in details:
+            # Check if Aadhar number already exists
+            cursor.execute("SELECT name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
+            existing_student = cursor.fetchone()
+            if existing_student:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Aadhar number {detail.aadhar_number} already exists for student {existing_student['name']}"
+                )
+
+            # Prepend +91 to MobileNumber if not already present
+            if not detail.contact_number.startswith("+91"):
+                detail.contact_number = f"+91{detail.contact_number}"
+
+            # Generate UserId and Password
+            user_id = generate_user_id(detail.contact_number, db)
+            password = generate_password()
+
+            # Insert student details
+            insert_query = """
+            INSERT INTO student (
+                school_id, name, dob, aadhar_number, contact_number, grade, gender, 
+                student_email, previous_school, mother_name, father_name, guardian_name, 
+                emergency_contact, previous_percentage, religion_id, category_id, 
+                nationality_id, medical_disability_id, parent_qualification_id, 
+                parent_occupation_id, student_user_id, password
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, (
+                detail.school_id, detail.name, detail.dob, detail.aadhar_number, 
+                detail.contact_number, detail.grade, detail.gender, detail.student_email, 
+                detail.previous_school, detail.mother_name, detail.father_name,
+                detail.guardian_name, detail.emergency_contact, detail.previous_percentage, 
+                detail.religion_id, detail.category_id, detail.nationality_id, 
+                detail.medical_disability_id, detail.parent_qualification_id, 
+                detail.parent_occupation_id, user_id, password
+            ))
+            student_id = cursor.lastrowid
+
+            # Insert languages if provided
+            if detail.languages:  # Now accessing languages from the detail object, not the list
+                # Validate only one mother tongue
+                mother_tongues = [lang for lang in detail.languages if lang.language_type == 'mother_tongue']
+                if len(mother_tongues) > 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Only one language can be marked as mother tongue"
+                    )
+
+                for lang in detail.languages:
+                    cursor.execute(
+                        "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
+                        (student_id, lang.language_id, lang.language_type)
+                    )
+
+            # Send SMS notification
+            send_sms(detail.contact_number, user_id, password, detail.name)
+
+            results.append({
+                "student_id": student_id,
+                "user_id": user_id,
+                "password": password,
+                "message": "Student registered successfully"
+            })
+
+        # Commit transaction if everything succeeded
+        db.commit()
         
-        # Add languages if provided
-        if detail.LanguagesKnown:
-            await add_student_languages(student_id, detail.LanguagesKnown, db)
+        # Return results - if single registration, return single object
+        return results[0] if len(results) == 1 else {"registrations": results}
 
-        # Send SMS with user ID and password
-        send_sms(mobile_number_with_country_code, user_id, password, detail.StudentName)
-
-    db.commit()
-
-    return {"message": "Registered", "UserId": user_id, "Password": password}
+    except mysql.connector.Error as err:
+        db.rollback()
+        logging.error(f"Database error: {err}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except HTTPException:
+        db.rollback()
+        raise  # Re-raise HTTPException
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+    finally:
+        cursor.close()
 
 @studentregistration_router.get("/grades")
 async def get_grades(db=Depends(get_db1)):
@@ -265,32 +265,96 @@ async def get_languages(db=Depends(get_db1)):
     return {"languages": languages}
 
 # Add new endpoint for student languages
-@studentregistration_router.post("/students/{student_id}/languages")
-async def add_student_languages(
-    student_id: int,
-    languages: List[StudentLanguage],
+@studentregistration_router.post("/student/{student_id}/languages")
+async def add_student_language(
+    student_id: int = Path(..., title="The ID of the student"),
+    language: StudentLanguage = ...,
     db=Depends(get_db1)
 ):
     cursor = db.cursor()
-    for lang in languages:
-        cursor.execute(
-            "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
-            (student_id, lang.language_id, lang.language_type)
-        )
-    db.commit()
-    return {"message": "Languages added successfully"}
+    try:
+        # Check if student exists
+        cursor.execute("SELECT student_id FROM student WHERE student_id = %s", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Student not found")
+
+        # Check if language exists
+        cursor.execute("SELECT language_id FROM languages WHERE language_id = %s", (language.language_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Invalid language ID")
+
+        # Validate only one mother tongue
+        if language.language_type == 'mother_tongue':
+            cursor.execute("""
+                SELECT id FROM student_languages 
+                WHERE student_id = %s AND language_type = 'mother_tongue'
+            """, (student_id,))
+            if cursor.fetchone():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Student already has a mother tongue language"
+                )
+
+        # Check if this language already exists for student
+        cursor.execute("""
+            SELECT id FROM student_languages 
+            WHERE student_id = %s AND language_id = %s
+        """, (student_id, language.language_id))
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="This language is already registered for the student"
+            )
+
+        # Insert new language
+        cursor.execute("""
+            INSERT INTO student_languages (student_id, language_id, language_type)
+            VALUES (%s, %s, %s)
+        """, (student_id, language.language_id, language.language_type))
+
+        db.commit()
+        return {"message": "Language added successfully"}
+    except mysql.connector.Error as err:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        cursor.close()
 
 # Add endpoint to get student languages
-@studentregistration_router.get("/students/{student_id}/languages")
-async def get_student_languages(student_id: int, db=Depends(get_db1)):
+@studentregistration_router.get("/student/{student_id}/languages")
+async def get_student_languages(
+    student_id: int = Path(..., title="The ID of the student"),
+    db=Depends(get_db1)
+):
     cursor = db.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT l.language_id, l.language_name, sl.language_type 
-        FROM languages l
-        JOIN student_languages sl ON l.language_id = sl.language_id
-        WHERE sl.student_id = %s
-    """, (student_id,))
-    return {"languages": cursor.fetchall()}
+    try:
+        # First check if student exists
+        cursor.execute("SELECT student_id FROM student WHERE student_id = %s", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Student not found")
+
+        # Get student languages with language details
+        cursor.execute("""
+            SELECT 
+                sl.id,
+                l.language_id,
+                l.language_name,
+                sl.language_type,
+                sl.created_at
+            FROM student_languages sl
+            JOIN languages l ON sl.language_id = l.language_id
+            WHERE sl.student_id = %s
+            ORDER BY 
+                CASE WHEN sl.language_type = 'mother_tongue' THEN 0 ELSE 1 END,
+                l.language_name
+        """, (student_id,))
+        
+        languages = cursor.fetchall()
+        return {"student_id": student_id, "languages": languages}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        cursor.close()
 
 @studentregistration_router.get("/nationalities")
 async def get_nationalities(db=Depends(get_db1)):
@@ -353,3 +417,18 @@ async def get_disabilities(db=Depends(get_db1)):
         ORDER BY disability_name
     """)
     return cursor.fetchall()
+
+@studentregistration_router.get("/categories")
+async def get_categories(db=Depends(get_db1)):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT 
+            category_id, 
+            category_code, 
+            category_name,
+            category_type
+        FROM reservation_categories
+        ORDER BY category_name
+    """)
+    categories = cursor.fetchall()
+    return {"categories": categories}
