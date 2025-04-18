@@ -27,6 +27,18 @@ sns_client = boto3.client(
     region_name="ap-south-1"
 )
 
+class Address(BaseModel):
+    line1: str
+    line2: Optional[str] = None
+    landmark: Optional[str] = None
+    locality: Optional[str] = None
+    city: str
+    district: str
+    state: str
+    country: str = "India"
+    pincode: str
+    address_type: str
+
 class Occupation(BaseModel):
     occupation_id: int
     occupation_name: str
@@ -67,6 +79,7 @@ class StudentRegistration(BaseModel):
     parent_qualification_id: Optional[int] = None  
     parent_occupation_id: Optional[int] = None
     languages: Optional[List[StudentLanguage]] = None
+    address: Optional[Address] = None
 
 
 class DocumentUploadPayload(BaseModel):
@@ -106,17 +119,46 @@ def send_sms(mobile_number: str, user_id: str, password: str, student_name: str)
     except Exception as e:
         logging.error(f"Failed to send SMS. Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send SMS. Error: {e}")
+    
+def insert_address(address_data: dict, db):
+    cursor = db.cursor(dictionary=True)
+    try:
+        insert_query = """
+        INSERT INTO addresses (
+            address_line1, address_line2, landmark, locality, 
+            city, district, state, country, pincode, address_type
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_query, (
+            address_data.get('line1'),
+            address_data.get('line2'),
+            address_data.get('landmark'),
+            address_data.get('locality'),
+            address_data.get('city'),
+            address_data.get('district'),
+            address_data.get('state'),
+            address_data.get('country'),
+            address_data.get('pincode'),
+            address_data.get('address_type')
+        ))
+        address_id = cursor.lastrowid
+        db.commit()
+        return address_id
+    except mysql.connector.Error as err:
+        db.rollback()
+        logging.error(f"Error inserting address: {err}")
+        raise
+    finally:
+        cursor.close()
 
 
 @studentregistration_router.post("/registerstudent")
 async def register_student(details: Union[StudentRegistration, List[StudentRegistration]], db=Depends(get_db1)):
-    cursor = db.cursor(dictionary=True)  # Use dictionary cursor for better handling
+    cursor = db.cursor(dictionary=True)
 
     try:
-        # Start transaction
         db.start_transaction()
 
-        # Convert single registration to list for uniform processing
         if isinstance(details, StudentRegistration):
             details = [details]
 
@@ -124,21 +166,28 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
         
         for detail in details:
             # Check if Aadhar number already exists
-            cursor.execute("SELECT name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
+            cursor.execute("SELECT student_user_id, name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
             existing_student = cursor.fetchone()
             if existing_student:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Aadhar number {detail.aadhar_number} already exists for student {existing_student['name']}"
-                )
+                results.append({
+                    "student_id": None,
+                    "user_id": existing_student["student_user_id"],
+                    "password": None,
+                    "message": f"Student with Aadhar number {detail.aadhar_number} already exists: {existing_student['name']}"
+                })
+                continue
 
-            # Prepend +91 to MobileNumber if not already present
             if not detail.contact_number.startswith("+91"):
                 detail.contact_number = f"+91{detail.contact_number}"
 
-            # Generate UserId and Password
             user_id = generate_user_id(detail.contact_number, db)
             password = generate_password()
+
+            # Insert address first - convert Pydantic model to dict
+            address_id = None
+            if detail.address:
+                address_dict = detail.address.dict()  # Convert Pydantic model to dictionary
+                address_id = insert_address(address_dict, db)
 
             # Insert student details
             insert_query = """
@@ -147,8 +196,8 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                 student_email, previous_school, mother_name, father_name, guardian_name, 
                 emergency_contact, previous_percentage, religion_id, category_id, 
                 nationality_id, medical_disability_id, parent_qualification_id, 
-                parent_occupation_id, student_user_id, password
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                parent_occupation_id, student_user_id, password, address_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(insert_query, (
                 detail.school_id, detail.name, detail.dob, detail.aadhar_number, 
@@ -157,13 +206,11 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                 detail.guardian_name, detail.emergency_contact, detail.previous_percentage, 
                 detail.religion_id, detail.category_id, detail.nationality_id, 
                 detail.medical_disability_id, detail.parent_qualification_id, 
-                detail.parent_occupation_id, user_id, password
+                detail.parent_occupation_id, user_id, password, address_id
             ))
             student_id = cursor.lastrowid
 
-            # Insert languages if provided
-            if detail.languages:  # Now accessing languages from the detail object, not the list
-                # Validate only one mother tongue
+            if detail.languages:
                 mother_tongues = [lang for lang in detail.languages if lang.language_type == 'mother_tongue']
                 if len(mother_tongues) > 1:
                     raise HTTPException(
@@ -177,7 +224,6 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                         (student_id, lang.language_id, lang.language_type)
                     )
 
-            # Send SMS notification
             send_sms(detail.contact_number, user_id, password, detail.name)
 
             results.append({
@@ -187,10 +233,7 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                 "message": "Student registered successfully"
             })
 
-        # Commit transaction if everything succeeded
         db.commit()
-        
-        # Return results - if single registration, return single object
         return results[0] if len(results) == 1 else {"registrations": results}
 
     except mysql.connector.Error as err:
@@ -199,14 +242,14 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
         raise HTTPException(status_code=500, detail="Database error occurred")
     except HTTPException:
         db.rollback()
-        raise  # Re-raise HTTPException
+        raise
     except Exception as e:
         db.rollback()
         logging.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
     finally:
         cursor.close()
-
+        
 @studentregistration_router.get("/grades")
 async def get_grades(db=Depends(get_db1)):
     cursor = db.cursor()
