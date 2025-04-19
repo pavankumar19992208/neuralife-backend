@@ -57,6 +57,13 @@ class StudentLanguage(BaseModel):
     language_id: int
     language_type: str  # 'mother_tongue' or 'secondary_language'
 
+class StudentDocument(BaseModel):
+    document_type_id: int
+    document_url: str
+    file_name: str
+    file_size_kb: float  # Add file size in KB
+    file_type: str 
+
 class StudentRegistration(BaseModel):
     school_id: Optional[str] = None
     name: Optional[str] = None
@@ -80,10 +87,13 @@ class StudentRegistration(BaseModel):
     parent_occupation_id: Optional[int] = None
     languages: Optional[List[StudentLanguage]] = None
     address: Optional[Address] = None
+    documents: Optional[List[StudentDocument]] = None
+    photo_url: Optional[str] = None
 
 
 class DocumentUploadPayload(BaseModel):
     Documents: Dict[str, str]
+    
 
 class Disability(BaseModel):
     disability_id: int
@@ -223,6 +233,39 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                         "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
                         (student_id, lang.language_id, lang.language_type)
                     )
+            
+            # After student is inserted (student_id is available)
+            if detail.documents:
+                for doc in detail.documents:
+                    cursor.execute("""
+                        INSERT INTO documents (
+                            user_id,
+                            document_type_id,
+                            entity_type,
+                            entity_id,
+                            document_url,
+                            file_name,
+                            file_size_kb,
+                            file_type,       
+                            upload_date,
+                            verification_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'Pending')
+                    """, (
+                        student_id,
+                        doc.document_type_id,
+                        'Student',
+                        student_id,
+                        doc.document_url,
+                        doc.file_name,
+                        doc.file_size_kb,
+                        doc.file_type
+                    ))
+
+            # Handle photo URL if provided
+            if detail.photo_url:
+                cursor.execute("""
+                    UPDATE student SET photo = %s WHERE student_id = %s
+                """, (detail.photo_url, student_id))
 
             send_sms(detail.contact_number, user_id, password, detail.name)
 
@@ -274,32 +317,179 @@ async def get_student_by_id(StudentId: int, db=Depends(get_db1)):
     return {"student": student}
 
 @studentregistration_router.post("/uploaddocuments/{student_id}")
-async def upload_documents(student_id: int, payload: DocumentUploadPayload, db=Depends(get_db1)):
-    logging.info(f"Received documents payload: {payload.Documents}")
-
-    cursor = db.cursor()
-
-    # Check if the student exists
-    cursor.execute("SELECT Documents FROM student WHERE StudentId = %s", (student_id,))
-    student = cursor.fetchone()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-
-    existing_documents = json.loads(student[0]) if student[0] else {}
-
-    # Update the documents for the existing student
-    updated_documents = {**existing_documents, **payload.Documents}
-    update_query = """
-    UPDATE student
-    SET Documents = %s
-    WHERE StudentId = %s
+async def upload_documents(
+    student_id: int = Path(..., title="The ID of the student"),
+    payload: DocumentUploadPayload = ...,
+    db=Depends(get_db1)
+):
     """
-    cursor.execute(update_query, (json.dumps(updated_documents), student_id))
+    Upload multiple documents for a student and store them in the documents table.
+    Expected payload format:
+    {
+        "Documents": {
+            "document_type_id_1": "document_url_1",
+            "document_type_id_2": "document_url_2",
+            ...
+        }
+    }
+    """
+    cursor = db.cursor(dictionary=True)
+    try:
+        db.start_transaction()
 
-    db.commit()
+        # First check if student exists
+        cursor.execute("SELECT student_id FROM student WHERE student_id = %s", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Student not found")
 
-    return {"message": "Documents uploaded successfully"}
+        # Process each document
+        for document_type_id, document_url in payload.Documents.items():
+            # Validate document_type_id exists
+            cursor.execute(
+                "SELECT name FROM document_type WHERE document_type_id = %s AND (applies_to = 'Student' OR applies_to = 'All')",
+                (document_type_id,)
+            )
+            doc_type = cursor.fetchone()
+            if not doc_type:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid document_type_id {document_type_id} or document type not applicable to students"
+                )
 
+            # Extract filename from URL (simple implementation)
+            file_name = document_url.split('/')[-1] if '/' in document_url else document_url
+
+            # Insert document record
+            insert_query = """
+            INSERT INTO documents (
+                user_id,
+                document_type_id,
+                entity_type,
+                entity_id,
+                document_url,
+                file_name,
+                upload_date,
+                verification_status
+            ) VALUES (%s, %s, %s, %s, %s, %s, NOW(), 'Pending')
+            """
+            cursor.execute(insert_query, (
+                student_id,  # Using student_id as user_id in this case
+                document_type_id,
+                'Student',
+                student_id,
+                document_url,
+                file_name
+            ))
+
+            # Get the mandatory documents for students
+            cursor.execute(
+                "SELECT document_type_id FROM document_type WHERE applies_to IN ('Student', 'All') AND is_mandatory = 1"
+            )
+            mandatory_docs = {row['document_type_id'] for row in cursor.fetchall()}
+
+            # Check if all mandatory documents are uploaded (basic check)
+            cursor.execute(
+                "SELECT DISTINCT document_type_id FROM documents WHERE entity_id = %s AND entity_type = 'Student'",
+                (student_id,)
+            )
+            uploaded_docs = {row['document_type_id'] for row in cursor.fetchall()}
+            missing_docs = mandatory_docs - uploaded_docs
+
+            if missing_docs:
+                logging.warning(f"Student {student_id} is missing mandatory documents: {missing_docs}")
+
+        db.commit()
+
+        return {
+            "message": "Documents uploaded successfully",
+            "student_id": student_id,
+            "uploaded_documents": len(payload.Documents)
+        }
+
+    except mysql.connector.Error as err:
+        db.rollback()
+        logging.error(f"Database error during document upload: {err}")
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Unexpected error during document upload: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+    finally:
+        cursor.close()
+
+
+@studentregistration_router.get("/student/{student_id}/documents")
+async def get_student_documents(
+    student_id: int = Path(..., title="The ID of the student"),
+    db=Depends(get_db1)
+):
+    """
+    Get all documents for a specific student with document type information
+    """
+    cursor = db.cursor(dictionary=True)
+    try:
+        # First check if student exists
+        cursor.execute("SELECT student_id FROM student WHERE student_id = %s", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Student not found")
+
+        # Get student documents with document type details
+        cursor.execute("""
+            SELECT 
+                d.document_id,
+                d.document_url,
+                d.file_name,
+                d.upload_date,
+                d.verification_status,
+                dt.document_type_id,
+                dt.name as document_type_name,
+                dt.description as document_description,
+                dt.is_mandatory
+            FROM documents d
+            JOIN document_type dt ON d.document_type_id = dt.document_type_id
+            WHERE d.entity_id = %s AND d.entity_type = 'Student'
+            ORDER BY dt.is_mandatory DESC, dt.name
+        """, (student_id,))
+        
+        documents = cursor.fetchall()
+        return {
+            "student_id": student_id,
+            "documents": documents,
+            "count": len(documents)
+        }
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        cursor.close()
+
+
+@studentregistration_router.get("/documenttypes/student")
+async def get_student_document_types(db=Depends(get_db1)):
+    """
+    Get all document types that apply to students
+    """
+    cursor = db.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT 
+                document_type_id,
+                name,
+                description,
+                is_mandatory,
+                validity_period_months
+            FROM document_type
+            WHERE applies_to IN ('Student', 'All')
+            ORDER BY is_mandatory DESC, name
+        """)
+        document_types = cursor.fetchall()
+        return {"document_types": document_types}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        cursor.close()
 @studentregistration_router.get("/languages")
 async def get_languages(db=Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
