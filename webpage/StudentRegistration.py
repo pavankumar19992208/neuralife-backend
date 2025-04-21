@@ -10,6 +10,7 @@ import json
 import logging
 import boto3
 import os
+from fastapi.responses import JSONResponse
 from typing import Literal 
 from dotenv import load_dotenv
 
@@ -175,18 +176,19 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
         results = []
         
         for detail in details:
-            # Check if Aadhar number already exists
+        # Check if Aadhar number already exists
             cursor.execute("SELECT student_user_id, name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
             existing_student = cursor.fetchone()
             if existing_student:
                 results.append({
+                    "status": "exists",
                     "student_id": None,
                     "user_id": existing_student["student_user_id"],
                     "password": None,
-                    "message": f"Student with Aadhar number {detail.aadhar_number} already exists: {existing_student['name']}"
+                    "message": f"Student with Aadhar number {detail.aadhar_number} already exists"
                 })
                 continue
-
+    
             if not detail.contact_number.startswith("+91"):
                 detail.contact_number = f"+91{detail.contact_number}"
 
@@ -270,11 +272,24 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
             send_sms(detail.contact_number, user_id, password, detail.name)
 
             results.append({
-                "student_id": student_id,
-                "user_id": user_id,
-                "password": password,
-                "message": "Student registered successfully"
-            })
+            "status": "success",
+            "student_id": student_id,
+            "user_id": user_id,
+            "password": password,
+            "message": "Student registered successfully"
+        })
+            # Return appropriate HTTP status
+        if any(result["status"] == "exists" for result in results):
+            if len(results) == 1:
+                return JSONResponse(
+                    status_code=409,
+                    content=results[0]
+                )
+            else:
+                return JSONResponse(
+                    status_code=207,  # Multi-status
+                    content={"registrations": results}
+                )
 
         db.commit()
         return results[0] if len(results) == 1 else {"registrations": results}
