@@ -33,12 +33,26 @@ from mysql.connector import Error
 #         return None
 
 
+# def get_db1():
+#     try:
+#         connection = mysql.connector.connect(
+#             host='localhost',
+#             user='root',  # replace with your MySQL username
+#             password='Pramod@23057',  # replace with your MySQL password
+#             database='neuraLife'  # replace with your MySQL database name
+#         )
+#         if connection.is_connected():
+#             print("Connected to MySQL database")
+#             return connection
+#     except Error as e:
+#         print(f"Error while connecting to MySQL: {e}")
+#         return None
 def get_db1():
     try:
         connection = mysql.connector.connect(
-            host='localhost',
+            host='34.93.179.195',
             user='root',  # replace with your MySQL username
-            password='Pramod@23057',  # replace with your MySQL password
+            password='neuraLife',  # replace with your MySQL password
             database='neuraLife'  # replace with your MySQL database name
         )
         if connection.is_connected():
@@ -47,7 +61,6 @@ def get_db1():
     except Error as e:
         print(f"Error while connecting to MySQL: {e}")
         return None
-    
 # def get_db3():
 #     try:
 #         connection = mysql.connector.connect(

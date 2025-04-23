@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from db import get_db1
 from pydantic import BaseModel
 import mysql.connector
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 import json
 import logging
+from datetime import time
 
 school_data = APIRouter()
 
@@ -12,33 +13,25 @@ school_data = APIRouter()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 
 class SchoolInternalData(BaseModel):
-    SchoolId: str
-    State: str
-    SchoolType: str
-    Curriculum: str
-    OtherCurriculum: str
-    GradeLevelFrom: str
-    GradeLevelTo: str
-    Subjects: List[str]
-    Medium: str
-    AcademicYearStart: str  # Format: YYYY-MM
-    AcademicYearEnd: str    # Format: YYYY-MM
-    ExtraPrograms: List[str]
-    SchoolTimingFrom: str
-    SchoolTimingTo: str
-    ExamPattern: str
-    OtherExamPattern: str
-    AssessmentCriteria: str
-    OtherAssessmentCriteria: str
-    FeeStructure: List[Dict[str, str]]
-    TotalAmount: float
-    TeachingStaff: List[str]
-    NonTeachingStaff: List[str]
-    GradesOffered: List[str]
+    school_id: str
+    school_type: str
+    curriculum: str
+    other_curriculum: Optional[str] = None
+    medium: str
+    academic_year_start: str
+    academic_year_end: str
+    school_timing_from: time
+    school_timing_to: time
+    exam_pattern: Optional[Union[str, int]] = None
+    assessment_criteria: Optional [str] = None
+    other_assessment_criteria: Optional[str] = None
+    other_exam_pattern: Optional[str] = None
+    state: Optional[str] = None
 
 class SchoolIdRequest(BaseModel):
-    SchoolId: str
+    school_id: str
 
 class TeacherRequest(BaseModel):
     SchoolId: str
@@ -49,93 +42,112 @@ class AllottedTeachersRequest(BaseModel):
     SchoolId: str
     AllottedTeachers: Dict[str, Dict[str, str]]
 
-@school_data.post("/schooldata")
-async def create_school_internal_data(details: SchoolInternalData, db=Depends(get_db1)):
-    cursor = db.cursor()
-    
-    # Create schooldata table if not exists
-    create_schooldata_table_query = """
-    CREATE TABLE IF NOT EXISTS schooldata (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        SchoolId VARCHAR(255),
-        State VARCHAR(255),
-        SchoolType VARCHAR(255),
-        Curriculum VARCHAR(255),
-        OtherCurriculum VARCHAR(255),
-        GradeLevelFrom VARCHAR(255),
-        GradeLevelTo VARCHAR(255),
-        Subjects JSON,
-        Medium VARCHAR(255),
-        AcademicYearStart VARCHAR(10),  # Format: YYYY-MM
-        AcademicYearEnd VARCHAR(10),    # Format: YYYY-MM
-        ExtraPrograms JSON,
-        SchoolTimingFrom TIME,
-        SchoolTimingTo TIME,
-        ExamPattern VARCHAR(255),
-        OtherExamPattern VARCHAR(255),
-        AssessmentCriteria VARCHAR(255),
-        OtherAssessmentCriteria VARCHAR(255),
-        FeeStructure JSON,
-        TotalAmount FLOAT,
-        TeachingStaff JSON,
-        NonTeachingStaff JSON,
-        GradesOffered JSON
-    )
-    """
-    cursor.execute(create_schooldata_table_query)
+class Activity(BaseModel):
+    activity_id: int
+    activity_name: str
 
-    # Check if GradesOffered column exists
-    cursor.execute("SHOW COLUMNS FROM schooldata LIKE 'GradesOffered'")
-    result = cursor.fetchone()
-    if not result:
-        # Alter table to add GradesOffered column if it does not exist
-        alter_table_query = """
-        ALTER TABLE schooldata 
-        ADD COLUMN GradesOffered JSON
-        """
-        cursor.execute(alter_table_query)
+@school_data.post("/schooldata")
+async def submit_school_type(data: SchoolInternalData, db=Depends(get_db1)):
+    try:
+        cursor = db.cursor()
+        
+        # Print received data
+        print("Received school type data:", data.dict())
+        
+        
+        # Insert only school type
+        cursor.execute("""
+        INSERT INTO school_data (school_id, school_type, curriculum, medium, academic_year_start,
+                        academic_year_end, school_timing_from, school_timing_to, exam_pattern, assessment_criteria,
+                        other_exam_pattern, state, other_curriculum, other_assessment_criteria)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (data.school_id, data.school_type, data.curriculum, data.medium, data.academic_year_start,
+               data.academic_year_end, data.school_timing_from, data.school_timing_to, data.exam_pattern, data.assessment_criteria,
+               data.other_exam_pattern, data.state, data.other_curriculum, data.other_assessment_criteria))
+        
+        db.commit()
+        
+        return {"message": "School type saved successfully"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@school_data.get("/active-activities", response_model=List[Activity])
+async def get_active_activities(db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT activity_id, activity_name 
+            FROM school_activities 
+            WHERE is_active = 1
+        """)
+        activities = cursor.fetchall()
+        return activities
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+# @school_data.post("/schoolinfo")
+# async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
+#     cursor = db.cursor(dictionary=True)
     
-    # Insert values into schooldata table
-    insert_schooldata_query = """
-    INSERT INTO schooldata (
-        SchoolId, State, SchoolType, Curriculum, OtherCurriculum, GradeLevelFrom, GradeLevelTo, Subjects, Medium,
-        AcademicYearStart, AcademicYearEnd, ExtraPrograms, SchoolTimingFrom, SchoolTimingTo, ExamPattern,
-        OtherExamPattern, AssessmentCriteria, OtherAssessmentCriteria, FeeStructure, TotalAmount, TeachingStaff, NonTeachingStaff, GradesOffered
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """
-    cursor.execute(insert_schooldata_query, (
-        details.SchoolId, details.State, details.SchoolType, details.Curriculum, details.OtherCurriculum,
-        details.GradeLevelFrom, details.GradeLevelTo, json.dumps(details.Subjects), details.Medium,
-        details.AcademicYearStart, details.AcademicYearEnd, json.dumps(details.ExtraPrograms),
-        details.SchoolTimingFrom, details.SchoolTimingTo, details.ExamPattern, details.OtherExamPattern,
-        details.AssessmentCriteria, details.OtherAssessmentCriteria, json.dumps(details.FeeStructure),
-        details.TotalAmount, json.dumps(details.TeachingStaff), json.dumps(details.NonTeachingStaff), json.dumps(details.GradesOffered)
-    ))
+#     # Query to get the row that matches the given SchoolId
+#     get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
+#     cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
     
-    db.commit()
+#     # Fetch the row
+#     row = cursor.fetchone()
     
-    return {"message": "Details updated successfully"}
+#     if row:
+#         # Convert JSON fields back to Python objects
+#         row['Subjects'] = json.loads(row['Subjects'])
+#         row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
+#         row['FeeStructure'] = json.loads(row['FeeStructure'])
+#         row['TeachingStaff'] = json.loads(row['TeachingStaff'])
+#         row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
+#         row['GradesOffered'] = json.loads(row['GradesOffered'])  # Ensure GradesOffered is included
+#         return {"message": "School info retrieved successfully", "data": row}
+#     else:
+#         raise HTTPException(status_code=404, detail="School data not found")
 
 @school_data.post("/schoolinfo")
 async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
     
-    # Query to get the row that matches the given SchoolId
-    get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
-    cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
+    query = "SELECT * FROM school_data WHERE school_id = %s"
+    cursor.execute(query, (school_id_request.school_id,))
     
-    # Fetch the row
     row = cursor.fetchone()
     
     if row:
-        # Convert JSON fields back to Python objects
-        row['Subjects'] = json.loads(row['Subjects'])
-        row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
-        row['FeeStructure'] = json.loads(row['FeeStructure'])
-        row['TeachingStaff'] = json.loads(row['TeachingStaff'])
-        row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
-        row['GradesOffered'] = json.loads(row['GradesOffered'])  # Ensure GradesOffered is included
-        return {"message": "School info retrieved successfully", "data": row}
+        # Convert JSON fields and maintain snake_case keys
+        return {
+            "message": "School info retrieved successfully",
+            "data": {
+                "school_id": row["school_id"],
+                "state": row["state"],
+                "school_type": row["school_type"],
+                "curriculum": row["curriculum"],
+                "other_curriculum": row["other_curriculum"],
+                "grade_level_from": row["grade_level_from"],
+                "grade_level_to": row["grade_level_to"],
+                "subjects": json.loads(row["subjects"]),
+                "medium": row["medium"],
+                "academic_year_start": row["academic_year_start"],
+                "academic_year_end": row["academic_year_end"],
+                "extra_programs": json.loads(row["extra_programs"]),
+                "school_timing_from": row["school_timing_from"],
+                "school_timing_to": row["school_timing_to"],
+                "exam_pattern": row["exam_pattern"],
+                "other_exam_pattern": row["other_exam_pattern"],
+                "assessment_criteria": row["assessment_criteria"],
+                "other_assessment_criteria": row["other_assessment_criteria"],
+                "fee_structure": json.loads(row["fee_structure"]),
+                "total_amount": row["total_amount"],
+                "teaching_staff": json.loads(row["teaching_staff"]),
+                "non_teaching_staff": json.loads(row["non_teaching_staff"]),
+                "grades_offered": json.loads(row["grades_offered"])
+            }
+        }
     else:
         raise HTTPException(status_code=404, detail="School data not found")
     
@@ -281,27 +293,131 @@ async def get_class_subjects_teachers(teacher_request: TeacherRequest, db=Depend
 
 # ...existing code...
 
-@school_data.post("/schoolinfo")
-async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
-    cursor = db.cursor(dictionary=True)
+# @school_data.post("/schoolinfo")
+# async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
+#     cursor = db.cursor(dictionary=True)
     
-    # Query to get the row that matches the given SchoolId
-    get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
-    cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
+#     # Query to get the row that matches the given SchoolId
+#     get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
+#     cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
     
-    # Fetch the row
-    row = cursor.fetchone()
+#     # Fetch the row
+#     row = cursor.fetchone()
     
-    if row:
-        # Convert JSON fields back to Python objects
-        row['Subjects'] = json.loads(row['Subjects'])
-        row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
-        row['FeeStructure'] = json.loads(row['FeeStructure'])
-        row['TeachingStaff'] = json.loads(row['TeachingStaff'])
-        row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
-        row['GradesOffered'] = json.loads(row['GradesOffered'])
-        return {"message": "School info retrieved successfully", "data": row}
-    else:
-        raise HTTPException(status_code=404, detail="School data not found")
+#     if row:
+#         # Convert JSON fields back to Python objects
+#         row['Subjects'] = json.loads(row['Subjects'])
+#         row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
+#         row['FeeStructure'] = json.loads(row['FeeStructure'])
+#         row['TeachingStaff'] = json.loads(row['TeachingStaff'])
+#         row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
+#         row['GradesOffered'] = json.loads(row['GradesOffered'])
+#         return {"message": "School info retrieved successfully", "data": row}
+#     else:
+#         raise HTTPException(status_code=404, detail="School data not found")
 
 # ...existing code...
+@school_data.get("/active-school-types")
+async def get_active_school_types(db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT type_name, typical_grades FROM school_types WHERE is_active = 1"
+        cursor.execute(query)
+        active_types = cursor.fetchall()
+        
+        if not active_types:
+            logger.warning("No active school types found")
+            
+        return {
+            "school_types": [
+                {
+                    "name": t["type_name"],
+                    "grades": t["typical_grades"]
+                } for t in active_types
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+@school_data.get("/active-exam-patterns")
+async def get_active_exam_patterns(db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = """
+            SELECT pattern_id, pattern_name, grading_system, term_structure 
+            FROM exam_patterns 
+            WHERE is_active = 1
+        """
+        cursor.execute(query)
+        patterns = cursor.fetchall()
+        
+        if not patterns:
+            logger.warning("No active exam patterns found")
+            
+        return {
+            "exam_patterns": [
+                {
+                    "id": p["pattern_id"],
+                    "name": p["pattern_name"],
+                    "grading": p["grading_system"],
+                    "term": p["term_structure"]
+                } for p in patterns
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+@school_data.get("/active-subjects")
+async def get_active_subjects(db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = """
+            SELECT subject_id, subject_name, subject_code, subject_type 
+            FROM subjects 
+            WHERE is_active = 1
+            ORDER BY subject_name
+        """
+        cursor.execute(query)
+        subjects = cursor.fetchall()
+        
+        if not subjects:
+            logger.warning("No active subjects found")
+            
+        return {
+            "subjects": [
+                {
+                    "id": s["subject_id"],
+                    "name": s["subject_name"],
+                    "code": s["subject_code"],
+                    "type": s["subject_type"]
+                } for s in subjects
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+@school_data.get("/staff-roles")
+async def get_staff_roles(db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
+        
+        # Get teaching roles (is_teaching_role = 1)
+        teaching_query = "SELECT role_id, role_name FROM school_roles WHERE is_teaching_role = 1 ORDER BY role_name"
+        cursor.execute(teaching_query)
+        teaching_roles = cursor.fetchall()
+        
+        # Get non-teaching staff roles (is_staff = 1 AND is_teaching_role = 0)
+        non_teaching_query = "SELECT role_id, role_name FROM school_roles WHERE is_staff = 1 AND is_teaching_role = 0 ORDER BY role_name"
+        cursor.execute(non_teaching_query)
+        non_teaching_roles = cursor.fetchall()
+        
+        return {
+            "teaching_roles": [{"id": r["role_id"], "name": r["role_name"]} for r in teaching_roles],
+            "non_teaching_roles": [{"id": r["role_id"], "name": r["role_name"]} for r in non_teaching_roles]
+        }
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error")
