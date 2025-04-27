@@ -29,6 +29,11 @@ class SchoolInternalData(BaseModel):
     other_assessment_criteria: Optional[str] = None
     other_exam_pattern: Optional[str] = None
     state: Optional[str] = None
+    subjects: Optional[List[int]] = None
+
+# class SchoolSubjectsRequest(BaseModel):
+#     school_id: str
+#     subject_ids: List[int]
 
 class SchoolIdRequest(BaseModel):
     school_id: str
@@ -50,29 +55,98 @@ class Activity(BaseModel):
 async def submit_school_type(data: SchoolInternalData, db=Depends(get_db1)):
     try:
         cursor = db.cursor()
-        
+
+        # Fetch the `id` from the `schools` table using the provided `school_id`
+        cursor.execute("SELECT id FROM schools WHERE school_id = %s", (data.school_id,))
+        school_record = cursor.fetchone()
+
+        if not school_record:
+            raise HTTPException(status_code=404, detail="School not found")
+
+        # Use the `id` from the `schools` table
+        school_id = school_record[0]
+
         # Print received data
-        print("Received school type data:", data.dict())
-        
-        
-        # Insert only school type
+        logger.info(f"Received school type data: {data.dict()}")
+
+
+        # Print received data
+        # print("Received school type data:", data.dict())
+
+        # Insert data into the `school_data` table
         cursor.execute("""
         INSERT INTO school_data (school_id, school_type, curriculum, medium, academic_year_start,
                         academic_year_end, school_timing_from, school_timing_to, exam_pattern, assessment_criteria,
                         other_exam_pattern, state, other_curriculum, other_assessment_criteria)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (data.school_id, data.school_type, data.curriculum, data.medium, data.academic_year_start,
+        """, (school_id, data.school_type, data.curriculum, data.medium, data.academic_year_start,
                data.academic_year_end, data.school_timing_from, data.school_timing_to, data.exam_pattern, data.assessment_criteria,
                data.other_exam_pattern, data.state, data.other_curriculum, data.other_assessment_criteria))
-        
+
+        # Get the last inserted `school_data` ID
+        school_data_id = cursor.lastrowid
+
+        # Insert selected subjects into the `school_subjects` table
+        if hasattr(data, "subjects") and data.subjects:  # Ensure `subjects` is part of the payload
+            for subject_id in data.subjects:
+                cursor.execute("""
+                INSERT INTO school_subjects (school_id, subject_id)
+                VALUES (%s, %s)
+                """, (school_id, subject_id))
+
         db.commit()
-        
+
         return {"message": "School type saved successfully"}
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    
+@school_data.get("/school/{school_id}/counts")
+async def get_school_counts(school_id: str, db=Depends(get_db1)):
+    try:
+        cursor = db.cursor(dictionary=True)
 
+        # Fetch the incremental `id` of the school using the provided `school_id`
+        cursor.execute("""
+            SELECT id 
+            FROM schools 
+            WHERE school_id = %s
+        """, (school_id,))
+        school_record = cursor.fetchone()
+
+        if not school_record:
+            raise HTTPException(status_code=404, detail="School not found")
+
+        # Use the incremental `id` of the school
+        school_incremental_id = school_record["id"]
+
+        # Query to fetch student count
+        cursor.execute("""
+            SELECT COUNT(*) AS student_count
+            FROM student
+            WHERE school_id = %s
+        """, (school_incremental_id,))
+        student_count_result = cursor.fetchone()
+        student_count = student_count_result["student_count"] if student_count_result else 0
+
+        # Query to fetch staff count
+        cursor.execute("""
+            SELECT COUNT(*) AS staff_count
+            FROM teachers
+            WHERE school_id = %s
+        """, (school_incremental_id,))
+        staff_count_result = cursor.fetchone()
+        staff_count = staff_count_result["staff_count"] if staff_count_result else 0
+
+        return {
+            "message": "Counts retrieved successfully",
+            "studentCount": student_count,
+            "staffCount": staff_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @school_data.get("/active-activities", response_model=List[Activity])
 async def get_active_activities(db=Depends(get_db1)):
     try:
@@ -86,28 +160,6 @@ async def get_active_activities(db=Depends(get_db1)):
         return activities
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# @school_data.post("/schoolinfo")
-# async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):
-#     cursor = db.cursor(dictionary=True)
-    
-#     # Query to get the row that matches the given SchoolId
-#     get_schooldata_query = "SELECT * FROM schooldata WHERE SchoolId = %s"
-#     cursor.execute(get_schooldata_query, (school_id_request.SchoolId,))
-    
-#     # Fetch the row
-#     row = cursor.fetchone()
-    
-#     if row:
-#         # Convert JSON fields back to Python objects
-#         row['Subjects'] = json.loads(row['Subjects'])
-#         row['ExtraPrograms'] = json.loads(row['ExtraPrograms'])
-#         row['FeeStructure'] = json.loads(row['FeeStructure'])
-#         row['TeachingStaff'] = json.loads(row['TeachingStaff'])
-#         row['NonTeachingStaff'] = json.loads(row['NonTeachingStaff'])
-#         row['GradesOffered'] = json.loads(row['GradesOffered'])  # Ensure GradesOffered is included
-#         return {"message": "School info retrieved successfully", "data": row}
-#     else:
-#         raise HTTPException(status_code=404, detail="School data not found")
 
 @school_data.post("/schoolinfo")
 async def get_school_info(school_id_request: SchoolIdRequest, db=Depends(get_db1)):

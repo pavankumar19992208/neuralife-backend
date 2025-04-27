@@ -3,7 +3,7 @@ from db import get_db1
 from pydantic import BaseModel, EmailStr
 from datetime import date
 import mysql.connector
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal
 import json
 import secrets
 import string
@@ -28,12 +28,12 @@ class Documents(BaseModel):
     educationalCertificates: Optional[str] = None
 
 class TeacherRegistration(BaseModel):
-    SchoolId: Optional[str] = None
-    fullName: Optional[str] = None
+    school_id: Optional[str] = None
+    name: Optional[str] = None
     profilepic: Optional[str] = None
-    dob: Optional[date] = None
+    teacher_dob: Optional[date] = None
     gender: Optional[str] = None
-    contactNumber: Optional[str] = None
+    contact_number: Optional[str] = None
     email: Optional[EmailStr] = None
     currentAddress: Optional[Address] = None
     permanentAddress: Optional[Address] = None
@@ -42,8 +42,9 @@ class TeacherRegistration(BaseModel):
     experience: Optional[int] = None
     qualification: Optional[str] = None
     certifications: Optional[str] = None
-    joiningDate: Optional[date] = None
-    employmentType: Optional[str] = None
+    joining_date: Optional[date] = None
+    # employment_type: Optional[str] = None
+    employment_type: Optional[Literal['Permanent', 'Contract', 'Temporary']] = None
     previousSchool: Optional[str] = None
     emergencyContactName: Optional[str] = None
     emergencyContactNumber: Optional[str] = None
@@ -66,152 +67,50 @@ def generate_password(length=8):
 @teacher_router.post("/registerteacher")
 async def register_teacher(details: TeacherRegistration, db=Depends(get_db1)):
     cursor = db.cursor()
+
+    # Normalize employment_type to match ENUM values
+    if details.employment_type:
+        details.employment_type = details.employment_type.capitalize()
+
+    # Fetch the incremental school ID from the schools table
+    fetch_school_id_query = "SELECT id FROM schools WHERE school_id = %s"
+    cursor.execute(fetch_school_id_query, (details.school_id,))
+    school = cursor.fetchone()
     
-    # Create teachers table if not exists
-    create_teachers_table_query = """
-    CREATE TABLE IF NOT EXISTS teachers (
-        teacherid INT AUTO_INCREMENT PRIMARY KEY,
-        userid VARCHAR(255),
-        SchoolId VARCHAR(255),
-        Name VARCHAR(255),
-        photo VARCHAR(255),
-        dob DATE,
-        gender VARCHAR(10),
-        contactNumber VARCHAR(20),
-        email VARCHAR(255),
-        currentAddress JSON,
-        permanentAddress JSON,
-        position JSON,
-        subjectSpecialization JSON,
-        experience INT,
-        qualification VARCHAR(255),
-        certifications TEXT,
-        joiningDate DATE,
-        employmentType VARCHAR(50),
-        previousSchool VARCHAR(255),
-        emergencyContactName VARCHAR(255),
-        emergencyContactNumber VARCHAR(20),
-        relationshipToTeacher VARCHAR(50),
-        languagesKnown JSON,
-        interests TEXT,
-        availabilityOfExtraCirricularActivities VARCHAR(255),
-        documents JSON,
-        password VARCHAR(255)
-    )
-    """
-    cursor.execute(create_teachers_table_query)
+    if not school:
+        raise HTTPException(status_code=404, detail=f"School with ID {details.school_id} not found")
     
+    school_id = school[0]  # Get the incremental ID of the school
+
+        
     # Check if contactNumber already exists
-    check_contact_query = "SELECT Name FROM teachers WHERE contactNumber = %s"
-    cursor.execute(check_contact_query, (details.contactNumber,))
+    check_contact_query = "SELECT Name FROM teachers WHERE contact_number = %s"
+    cursor.execute(check_contact_query, (details.contact_number,))
     existing_teacher = cursor.fetchone()
     
     if existing_teacher:
-        return {"message": f"{details.contactNumber} is already registered with name {existing_teacher[0]}"}
+        return {"message": f"{details.contact_number} is already registered with name {existing_teacher[0]}"}
     
     # Generate a password
     generated_password = generate_password()
     
     # Generate userid
-    userid = f"T{details.contactNumber}"
+    teacher_user_id = f"T{details.contact_number}"
     
     # Insert values into teachers table
     insert_teacher_query = """
     INSERT INTO teachers (
-        userid, SchoolId, Name, photo, dob, gender, contactNumber, email, currentAddress, permanentAddress, position,
-        subjectSpecialization, experience, qualification, certifications, joiningDate, employmentType, previousSchool, emergencyContactName, emergencyContactNumber, relationshipToTeacher,
-        languagesKnown, interests, availabilityOfExtraCirricularActivities, documents, password
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        teacher_user_id, school_id, name, teacher_dob, gender, contact_number, email, joining_date, employment_type, password
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     cursor.execute(insert_teacher_query, (
-        userid, details.SchoolId, details.fullName, details.profilepic, details.dob, details.gender, details.contactNumber, details.email,
-        json.dumps(details.currentAddress.dict()) if details.currentAddress else None,
-        json.dumps(details.permanentAddress.dict()) if details.permanentAddress else None,
-        json.dumps(details.position) if details.position else None,
-        json.dumps(details.subjectSpecialization) if details.subjectSpecialization else None,
-        details.experience, details.qualification, details.certifications, details.joiningDate, details.employmentType, details.previousSchool, details.emergencyContactName, details.emergencyContactNumber,
-        details.relationshipToTeacher, json.dumps(details.languagesKnown) if details.languagesKnown else None,
-        details.interests, details.availabilityOfExtraCirricularActivities,
-        json.dumps(details.documents.dict()) if details.documents else None, generated_password
+        teacher_user_id, school_id, details.name, details.teacher_dob, details.gender, details.contact_number, details.email,
+        details.joining_date, details.employment_type, generated_password
     ))
-    
-    # Create staffallocation table if not exists
-    create_staffallocation_table_query = """
-    CREATE TABLE IF NOT EXISTS staffallocation (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        schoolid VARCHAR(255),
-        subject VARCHAR(255),
-        nursery JSON,
-        LKG JSON,
-        UKG JSON,
-        class_1 JSON,
-        class_2 JSON,
-        class_3 JSON,
-        class_4 JSON,
-        class_5 JSON,
-        class_6 JSON,
-        class_7 JSON,
-        class_8 JSON,
-        class_9 JSON,
-        class_10 JSON,
-        class_11 JSON,
-        class_12 JSON
-    )
-    """
-    cursor.execute(create_staffallocation_table_query)
-    x=[]
-    y=[]
-    z=[]
-    for subject, classes in details.subjectSpecialization.items():
-        y.append(subject)
-        z.append(classes)
-        for i in classes:
-            x.append(i)
-    x=set(x)
-    print(x,y,z)
-
-    # Insert subjects and initialize class cells with empty dict format
-    for subject in x:
-        print(subject, classes)
-        insert_staffallocation_query = """
-        INSERT INTO staffallocation (
-            schoolid, subject, nursery, LKG, UKG, class_1, class_2, class_3, class_4, class_5, class_6, class_7, class_8, class_9, class_10, class_11, class_12
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        # Check if the subject already exists for the given SchoolId
-        check_subject_query = "SELECT 1 FROM staffallocation WHERE SchoolId = %s AND subject = %s"
-        cursor.execute(check_subject_query, (details.SchoolId, subject))
-        existing_subject = cursor.fetchone()
-        
-        # Perform the insertion if the subject does not exist
-        if not existing_subject:
-            cursor.execute(insert_staffallocation_query, (
-                details.SchoolId, subject, json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-                json.dumps({"teacherlist": [], "allocatedteacher": []}), json.dumps({"teacherlist": [], "allocatedteacher": []}),
-            ))
-        
-    for i in range(len(y)):
-        clas = y[i]
-        clas = clas.replace(" ", "_")
-        clas = clas.lower()
-        for subject in z[i]:
-            print(clas, subject)
-            update_staffallocation_query = """
-            UPDATE staffallocation
-            SET {clas} = JSON_SET({clas}, '$.teacherlist', JSON_ARRAY_APPEND(JSON_EXTRACT({clas}, '$.teacherlist'), '$', %s))
-            WHERE schoolid = %s AND subject = %s
-            """
-            cursor.execute(update_staffallocation_query.format(clas=clas), (userid, details.SchoolId, subject))
     
     db.commit()
     
-    return {"message": f"{details.fullName} was registered successfully", "userid": userid, "password": generated_password}
+    return {"message": f"{details.name} was registered successfully", "userid": teacher_user_id, "password": generated_password}
 
 @teacher_router.get("/teachers")
 async def get_teachers(db=Depends(get_db1)):

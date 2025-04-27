@@ -5,7 +5,7 @@ import mysql.connector
 import secrets
 import string
 from typing import List, Dict, Optional, Union
-from datetime import date
+from datetime import datetime
 import json
 import logging
 import boto3
@@ -13,6 +13,7 @@ import os
 from fastapi.responses import JSONResponse
 from typing import Literal 
 from dotenv import load_dotenv
+import pytz # handles timezone
 
 load_dotenv()
 
@@ -68,7 +69,7 @@ class StudentDocument(BaseModel):
 class StudentRegistration(BaseModel):
     school_id: Optional[str] = None
     name: Optional[str] = None
-    dob: Optional[date] = None
+    dob: Optional[datetime] = None
     aadhar_number: Optional[str] = None
     contact_number: Optional[str] = None
     grade: Optional[int] = None
@@ -163,6 +164,156 @@ def insert_address(address_data: dict, db):
         cursor.close()
 
 
+# @studentregistration_router.post("/registerstudent")
+# async def register_student(details: Union[StudentRegistration, List[StudentRegistration]], db=Depends(get_db1)):
+#     cursor = db.cursor(dictionary=True)
+
+#     try:
+#         db.start_transaction()
+
+#         if isinstance(details, StudentRegistration):
+#             details = [details]
+
+#         results = []
+        
+#         for detail in details:
+#         # Check if Aadhar number already exists
+#             cursor.execute("SELECT student_user_id, name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
+#             existing_student = cursor.fetchone()
+#             if existing_student:
+#                 results.append({
+#                     "status": "exists",
+#                     "student_id": None,
+#                     "user_id": existing_student["student_user_id"],
+#                     "password": None,
+#                     "message": f"Student with Aadhar number {detail.aadhar_number} already exists"
+#                 })
+#                 continue
+    
+#             if not detail.contact_number.startswith("+91"):
+#                 detail.contact_number = f"+91{detail.contact_number}"
+
+#             user_id = generate_user_id(detail.contact_number, db)
+#             password = generate_password()
+
+#             # Insert address first - convert Pydantic model to dict
+#             address_id = None
+#             if detail.address:
+#                 address_dict = detail.address.dict()  # Convert Pydantic model to dictionary
+#                 address_id = insert_address(address_dict, db)
+
+#             # Insert student details
+#             insert_query = """
+#             INSERT INTO student (
+#                 school_id, name, dob, aadhar_number, contact_number, grade, gender, 
+#                 student_email, previous_school, mother_name, father_name, guardian_name, 
+#                 emergency_contact, previous_percentage, religion_id, category_id, 
+#                 nationality_id, medical_disability_id, parent_qualification_id, 
+#                 parent_occupation_id, student_user_id, password, address_id
+#             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+#             """
+#             cursor.execute(insert_query, (
+#                 detail.school_id, detail.name, detail.dob, detail.aadhar_number, 
+#                 detail.contact_number, detail.grade, detail.gender, detail.student_email, 
+#                 detail.previous_school, detail.mother_name, detail.father_name,
+#                 detail.guardian_name, detail.emergency_contact, detail.previous_percentage, 
+#                 detail.religion_id, detail.category_id, detail.nationality_id, 
+#                 detail.medical_disability_id, detail.parent_qualification_id, 
+#                 detail.parent_occupation_id, user_id, password, address_id
+#             ))
+#             student_id = cursor.lastrowid
+
+#             if detail.languages:
+#                 mother_tongues = [lang for lang in detail.languages if lang.language_type == 'mother_tongue']
+#                 if len(mother_tongues) > 1:
+#                     raise HTTPException(
+#                         status_code=400,
+#                         detail="Only one language can be marked as mother tongue"
+#                     )
+
+#                 for lang in detail.languages:
+#                     cursor.execute(
+#                         "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
+#                         (student_id, lang.language_id, lang.language_type)
+#                     )
+            
+#             # After student is inserted (student_id is available)
+#             if detail.documents:
+#                 for doc in detail.documents:
+#                     # Get the current time in IST
+#                     ist = pytz.timezone('Asia/Kolkata')
+#                     current_time_ist = datetime.now(ist)
+            
+#                     cursor.execute("""
+#                         INSERT INTO documents (
+#                             user_id,
+#                             document_type_id,
+#                             entity_type,
+#                             entity_id,
+#                             document_url,
+#                             file_name,
+#                             file_size_kb,
+#                             file_type,       
+#                             upload_date,
+#                             verification_status
+#                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending')
+#                     """, (
+#                         student_id,
+#                         doc.document_type_id,
+#                         'Student',
+#                         student_id,
+#                         doc.document_url,
+#                         doc.file_name,
+#                         doc.file_size_kb,
+#                         doc.file_type,
+#                         current_time_ist  # Use IST time here
+#                     ))
+
+#             # Handle photo URL if provided
+#             if detail.photo_url:
+#                 cursor.execute("""
+#                     UPDATE student SET photo = %s WHERE student_id = %s
+#                 """, (detail.photo_url, student_id))
+
+#             send_sms(detail.contact_number, user_id, password, detail.name)
+
+#             results.append({
+#             "status": "success",
+#             "student_id": student_id,
+#             "user_id": user_id,
+#             "password": password,
+#             "message": "Student registered successfully"
+#         })
+#             # Return appropriate HTTP status
+#         if any(result["status"] == "exists" for result in results):
+#             if len(results) == 1:
+#                 return JSONResponse(
+#                     status_code=409,
+#                     content=results[0]
+#                 )
+#             else:
+#                 return JSONResponse(
+#                     status_code=207,  # Multi-status
+#                     content={"registrations": results}
+#                 )
+
+#         db.commit()
+#         return results[0] if len(results) == 1 else {"registrations": results}
+
+#     except mysql.connector.Error as err:
+#         db.rollback()
+#         logging.error(f"Database error: {err}")
+#         raise HTTPException(status_code=500, detail="Database error occurred")
+#     except HTTPException:
+#         db.rollback()
+#         raise
+#     except Exception as e:
+#         db.rollback()
+#         logging.error(f"Unexpected error: {e}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred")
+#     finally:
+#         cursor.close()
+
 @studentregistration_router.post("/registerstudent")
 async def register_student(details: Union[StudentRegistration, List[StudentRegistration]], db=Depends(get_db1)):
     cursor = db.cursor(dictionary=True)
@@ -174,9 +325,21 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
             details = [details]
 
         results = []
-        
+
         for detail in details:
-        # Check if Aadhar number already exists
+            # First fetch the incremental school ID
+            cursor.execute("SELECT id FROM schools WHERE school_id = %s", (detail.school_id,))
+            school = cursor.fetchone()
+            if not school:
+                results.append({
+                    "status": "error",
+                    "message": f"School with ID {detail.school_id} not found"
+                })
+                continue
+                
+            incremental_school_id = school['id']
+
+            # Check if Aadhar number already exists
             cursor.execute("SELECT student_user_id, name FROM student WHERE aadhar_number = %s", (detail.aadhar_number,))
             existing_student = cursor.fetchone()
             if existing_student:
@@ -188,20 +351,14 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                     "message": f"Student with Aadhar number {detail.aadhar_number} already exists"
                 })
                 continue
-    
+
             if not detail.contact_number.startswith("+91"):
                 detail.contact_number = f"+91{detail.contact_number}"
 
             user_id = generate_user_id(detail.contact_number, db)
             password = generate_password()
 
-            # Insert address first - convert Pydantic model to dict
-            address_id = None
-            if detail.address:
-                address_dict = detail.address.dict()  # Convert Pydantic model to dictionary
-                address_id = insert_address(address_dict, db)
-
-            # Insert student details
+            # Insert student details using incremental_school_id
             insert_query = """
             INSERT INTO student (
                 school_id, name, dob, aadhar_number, contact_number, grade, gender, 
@@ -209,18 +366,31 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                 emergency_contact, previous_percentage, religion_id, category_id, 
                 nationality_id, medical_disability_id, parent_qualification_id, 
                 parent_occupation_id, student_user_id, password, address_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)
             """
             cursor.execute(insert_query, (
-                detail.school_id, detail.name, detail.dob, detail.aadhar_number, 
+                incremental_school_id,  # Using incremental ID here
+                detail.name, detail.dob, detail.aadhar_number, 
                 detail.contact_number, detail.grade, detail.gender, detail.student_email, 
                 detail.previous_school, detail.mother_name, detail.father_name,
                 detail.guardian_name, detail.emergency_contact, detail.previous_percentage, 
                 detail.religion_id, detail.category_id, detail.nationality_id, 
                 detail.medical_disability_id, detail.parent_qualification_id, 
-                detail.parent_occupation_id, user_id, password, address_id
+                detail.parent_occupation_id, user_id, password
             ))
+            
             student_id = cursor.lastrowid
+
+            # Insert address only after student is successfully inserted
+            if detail.address:
+                address_dict = detail.address.dict()  # Convert Pydantic model to dictionary
+                address_id = insert_address(address_dict, db)
+                if address_id:
+                    # Update the student table with the address_id
+                    cursor.execute("UPDATE student SET address_id = %s WHERE id = %s", (address_id, student_id))
+                else:
+                    logging.error("Failed to insert address. Address ID is None.")
+                    raise HTTPException(status_code=500, detail="Failed to insert address.")
 
             if detail.languages:
                 mother_tongues = [lang for lang in detail.languages if lang.language_type == 'mother_tongue']
@@ -235,10 +405,14 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                         "INSERT INTO student_languages (student_id, language_id, language_type) VALUES (%s, %s, %s)",
                         (student_id, lang.language_id, lang.language_type)
                     )
-            
+
             # After student is inserted (student_id is available)
             if detail.documents:
                 for doc in detail.documents:
+                    # Get the current time in IST
+                    ist = pytz.timezone('Asia/Kolkata')
+                    current_time_ist = datetime.now(ist)
+
                     cursor.execute("""
                         INSERT INTO documents (
                             user_id,
@@ -251,7 +425,7 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                             file_type,       
                             upload_date,
                             verification_status
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'Pending')
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending')
                     """, (
                         student_id,
                         doc.document_type_id,
@@ -260,25 +434,27 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
                         doc.document_url,
                         doc.file_name,
                         doc.file_size_kb,
-                        doc.file_type
+                        doc.file_type,
+                        current_time_ist  # Use IST time here
                     ))
 
             # Handle photo URL if provided
             if detail.photo_url:
                 cursor.execute("""
-                    UPDATE student SET photo = %s WHERE student_id = %s
+                    UPDATE student SET photo = %s WHERE id = %s
                 """, (detail.photo_url, student_id))
 
             send_sms(detail.contact_number, user_id, password, detail.name)
 
             results.append({
-            "status": "success",
-            "student_id": student_id,
-            "user_id": user_id,
-            "password": password,
-            "message": "Student registered successfully"
-        })
-            # Return appropriate HTTP status
+                "status": "success",
+                "student_id": student_id,
+                "user_id": user_id,
+                "password": password,
+                "message": "Student registered successfully"
+            })
+
+        # Return appropriate HTTP status
         if any(result["status"] == "exists" for result in results):
             if len(results) == 1:
                 return JSONResponse(
@@ -306,8 +482,8 @@ async def register_student(details: Union[StudentRegistration, List[StudentRegis
         logging.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
     finally:
-        cursor.close()
-        
+        cursor.close()     
+
 @studentregistration_router.get("/grades")
 async def get_grades(db=Depends(get_db1)):
     cursor = db.cursor()
